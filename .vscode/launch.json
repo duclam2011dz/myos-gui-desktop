@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to MyOS QEMU",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/kernel.elf",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "miDebuggerServerAddress": "localhost:1234",
+      "setupCommands": [
+        {
+          "text": "set architecture i386"
+        },
+        {
+          "text": "set disassembly-flavor intel"
+        },
+        {
+          "text": "set pagination off"
+        },
+        {
+          "text": "break kernel_main"
+        }
+      ]
+    }
+  ]
+}

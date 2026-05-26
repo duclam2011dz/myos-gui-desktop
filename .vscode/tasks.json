@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build MyOS",
+      "type": "shell",
+      "command": "make",
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "Run MyOS",
+      "type": "shell",
+      "command": "make run"
+    },
+    {
+      "label": "Debug QEMU Server",
+      "type": "shell",
+      "command": "make debug",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Debug GUI QEMU Server",
+      "type": "shell",
+      "command": "make debug-gui",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Test MyOS",
+      "type": "shell",
+      "command": "make test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint MyOS",
+      "type": "shell",
+      "command": "make lint format-check",
+      "problemMatcher": "$gcc"
+    }
+  ]
+}

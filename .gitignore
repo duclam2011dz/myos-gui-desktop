@@ -1,0 +1,7 @@
+build/
+*.log
+*.sock
+__pycache__/
+*.pyc
+.cache/
+compile_commands.json

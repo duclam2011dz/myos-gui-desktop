@@ -1,0 +1,12 @@
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-braces-around-statements
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*include/myos/.*|.*kernel/.*|.*arch/x86/.*'
+AnalyzeTemporaryDtors: false
+CheckOptions:
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'
