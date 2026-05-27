@@ -41,7 +41,7 @@ static void draw_icon(graphics_surface *surface, int32_t x, int32_t y, const cha
 
 Rect Desktop::start_menu_rect(const Metrics &metrics)
 {
-    int32_t menu_h = metrics.height >= 480 ? 114 : 72;
+    int32_t menu_h = metrics.height >= 480 ? 150 : 108;
     int32_t menu_w = metrics.width >= 640 ? 184 : 126;
     return Rect{4, (int32_t) metrics.height - (int32_t) metrics.taskbar_h - menu_h - 2, menu_w, menu_h};
 }
@@ -60,6 +60,9 @@ static void draw_start_menu(graphics_surface *surface, const Metrics &metrics, b
     graphics_draw_string(surface, menu.x + 28, menu.y + 28, "FILES", COLOR_TEXT_DARK, COLOR_WINDOW);
     graphics_draw_string(surface, menu.x + 28, menu.y + 44, "MONITOR", COLOR_TEXT_DARK, COLOR_WINDOW);
     graphics_draw_string(surface, menu.x + 28, menu.y + 60, "ABOUT", COLOR_TEXT_DARK, COLOR_WINDOW);
+    graphics_fill_rect(surface, menu.x + 26, menu.y + 78, menu.w - 32, 1, COLOR_WINDOW_BORDER);
+    graphics_draw_string(surface, menu.x + 28, menu.y + 88, "SHUTDOWN", COLOR_TEXT_DARK, COLOR_WINDOW);
+    graphics_draw_string(surface, menu.x + 28, menu.y + 104, "RESTART", COLOR_TEXT_DARK, COLOR_WINDOW);
 }
 
 static void draw_task_button(graphics_surface *surface, const Metrics &metrics, int32_t x,

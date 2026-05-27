@@ -45,6 +45,8 @@ enum class HitTarget : uint8_t {
     DesktopIcon,
     StartButton,
     StartTerminal,
+    StartShutdown,
+    StartRestart,
     TaskButton,
     WindowClient,
     WindowTitlebar,

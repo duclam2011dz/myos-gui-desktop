@@ -30,6 +30,7 @@ struct asset_bitmap {
 
 static struct asset_bitmap wallpaper;
 static struct asset_bitmap cursor;
+static struct asset_bitmap text_cursor;
 
 static bool load_myimg(const char *path, struct asset_bitmap *out)
 {
@@ -72,6 +73,7 @@ void assets_initialize(void)
 {
     (void) load_myimg("/assets/wallpaper.myimg", &wallpaper);
     (void) load_myimg("/assets/cursor_pointer.myimg", &cursor);
+    (void) load_myimg("/assets/cursor_text.myimg", &text_cursor);
 }
 
 static uint32_t rgb565_to_rgb888(uint16_t value)
@@ -140,22 +142,23 @@ bool assets_draw_wallpaper(struct graphics_surface *surface)
     return true;
 }
 
-bool assets_draw_cursor(struct graphics_surface *surface, int32_t x, int32_t y)
+bool assets_draw_cursor(struct graphics_surface *surface, int32_t x, int32_t y, bool text_mode)
 {
-    if (!graphics_surface_is_valid(surface) || cursor.pixels == 0 || cursor.format != MYIMG_ARGB32) {
+    struct asset_bitmap *active = text_mode && text_cursor.pixels != 0 ? &text_cursor : &cursor;
+    if (!graphics_surface_is_valid(surface) || active->pixels == 0 || active->format != MYIMG_ARGB32) {
         return false;
     }
-    const uint32_t *src = (const uint32_t *) cursor.pixels;
-    int32_t left = x - (int32_t) cursor.hotspot_x;
-    int32_t top = y - (int32_t) cursor.hotspot_y;
-    for (uint32_t row = 0; row < cursor.height; row++) {
-        for (uint32_t col = 0; col < cursor.width; col++) {
+    const uint32_t *src = (const uint32_t *) active->pixels;
+    int32_t left = x - (int32_t) active->hotspot_x;
+    int32_t top = y - (int32_t) active->hotspot_y;
+    for (uint32_t row = 0; row < active->height; row++) {
+        for (uint32_t col = 0; col < active->width; col++) {
             int32_t px = left + (int32_t) col;
             int32_t py = top + (int32_t) row;
             if (px < 0 || py < 0 || px >= (int32_t) surface->width || py >= (int32_t) surface->height) {
                 continue;
             }
-            uint32_t argb = src[row * cursor.width + col];
+            uint32_t argb = src[row * active->width + col];
             uint32_t alpha = argb >> 24;
             if (alpha == 0) {
                 continue;
@@ -171,12 +174,14 @@ bool assets_draw_cursor(struct graphics_surface *surface, int32_t x, int32_t y)
     return true;
 }
 
-uint32_t assets_cursor_width(void)
+uint32_t assets_cursor_width(bool text_mode)
 {
-    return cursor.pixels != 0 ? cursor.width : 0;
+    struct asset_bitmap *active = text_mode && text_cursor.pixels != 0 ? &text_cursor : &cursor;
+    return active->pixels != 0 ? active->width : 0;
 }
 
-uint32_t assets_cursor_height(void)
+uint32_t assets_cursor_height(bool text_mode)
 {
-    return cursor.pixels != 0 ? cursor.height : 0;
+    struct asset_bitmap *active = text_mode && text_cursor.pixels != 0 ? &text_cursor : &cursor;
+    return active->pixels != 0 ? active->height : 0;
 }

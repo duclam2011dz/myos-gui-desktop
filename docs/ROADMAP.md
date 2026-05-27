@@ -4,8 +4,8 @@ MyOS currently has a BIOS boot sector plus stage2 loader, E820 memory handoff,
 VBE linear framebuffer graphics with VGA mode 13h fallback, high-memory
 framebuffer paging, a pixel/font renderer, freestanding C++ GUI modules,
 double-buffered Windows-like desktop GUI, PS/2 keyboard and mouse input, a
-normalized GUI input event layer, a taskbar with Start button, CMOS-backed
-clock/date, app indicator, PNG-derived wallpaper and cursor assets, Terminal
+normalized GUI input event layer, a taskbar with Start button, Shutdown/Restart
+power actions, CMOS-backed clock/date, app indicator, PNG-derived wallpaper and cursor assets, Terminal
 shortcut, File Explorer, Notepad text editor, System
 Monitor, About app, window controls,
 32-bit protected mode, kernel-owned GDT/TSS, ring 3 user mode, `int 0x80`
@@ -93,6 +93,8 @@ and exception diagnostics.
   - Diskfs packages `/assets/wallpaper.myimg` and
     `/assets/cursor_pointer.myimg`; the desktop renders those assets instead of
     the old hard-coded gradient wallpaper and bitmask cursor.
+  - Cursor assets now include a smaller pointer and a text-entry `|` cursor
+    variant generated from the atlas.
   - Source folders are grouped by responsibility: build/test/dev tools live
     under `tools/`, drivers under `kernel/drivers/{input,platform,storage,video}`,
     assets under `kernel/assets`, and diskfs under `kernel/fs/diskfs`.
@@ -111,6 +113,12 @@ and exception diagnostics.
     middle, and right button state; GUI Terminal can scroll from wheel events.
   - CMOS RTC provides real taskbar wall-clock time.
   - PCI config-space scanning records devices and exposes a `pci` shell command.
+- Cursor and power UX:
+  - GUI cursor drawing now animates toward the real mouse target in small steps,
+    reducing visible pointer jumps from large PS/2 deltas.
+  - Typing printable text temporarily switches the pointer to the text cursor.
+  - Start Menu includes Shutdown and Restart actions wired to platform power
+    routines.
 
 ## Recommended Next Updates
 
@@ -124,7 +132,7 @@ and exception diagnostics.
    - Next widgets: extract titlebar buttons, menu rows, task buttons, scrollbars,
      desktop icons, and text surfaces into reusable C++ widget primitives.
    - Next interaction: add z-ordered taskbar arrangement, Alt-Tab focus cycling,
-     keyboard focus events, and optional window snap zones.
+     explicit focus-change events, and optional window snap zones.
 
 2. GUI applications
    - Current state: Terminal, File Explorer, Notepad, System Monitor, and About
@@ -142,7 +150,7 @@ and exception diagnostics.
 
 3. Terminal UX
    - Add text selection and copy/paste buffers.
-   - Add visible scrollbars and tune wheel acceleration.
+   - Add visible scrollbars and configurable wheel/page scroll speed.
    - Add configurable font scale for high-DPI modes.
 
 4. Driver/platform polish
@@ -150,8 +158,8 @@ and exception diagnostics.
      IntelliMouse wheel packets, CMOS time, and PCI enumeration are implemented.
    - Next platform work: identify PCI IDE/class drivers, add controller-specific
      driver binding, and surface PCI device names in GUI diagnostics.
-   - Next input work: add Alt-Tab, text selection shortcuts, and full scancode
-     set coverage for extended navigation keys.
+   - Next input work: add Alt-Tab, text selection shortcuts, cursor-shape hit
+     testing by window region, and full scancode set coverage for extended keys.
 
 5. Filesystem and reliability
    - Current state: diskfs v2 has directory-aware paths, inodes, bitmap
@@ -164,7 +172,7 @@ and exception diagnostics.
 
 ## Suggested Immediate Milestone
 
-Next time, generalize the C++ window manager. The OS now has an event layer,
-dirty-region tracking, visual regression tests, faster primitives, and C++ GUI
-modules; the next bottleneck is replacing single-app assumptions with reusable
-window/widget abstractions.
+Next time, generalize the C++ window manager and widget model. The OS now has
+asset-backed visuals, smoother cursor presentation, power actions, dirty-region
+tracking, and C++ GUI modules; the next bottleneck is replacing single-app
+assumptions with reusable window/widget abstractions.

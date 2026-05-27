@@ -26,7 +26,7 @@ KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 FS_IMG := $(BUILD_DIR)/fs.img
 OS_IMAGE := $(BUILD_DIR)/myos.img
 ASSET_MANIFEST := assets/manifest.json
-ASSET_FILES := $(BUILD_DIR)/assets/wallpaper.myimg $(BUILD_DIR)/assets/cursor_pointer.myimg
+ASSET_FILES := $(BUILD_DIR)/assets/wallpaper.myimg $(BUILD_DIR)/assets/cursor_pointer.myimg $(BUILD_DIR)/assets/cursor_text.myimg
 
 CFLAGS := -std=gnu11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector \
 	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
@@ -40,7 +40,7 @@ LDFLAGS := -nostdlib -T linker.ld
 KERNEL_ASM := arch/x86/boot/entry.asm arch/x86/interrupts/isr.asm arch/x86/switch.asm arch/x86/gdt_flush.asm arch/x86/usermode.asm
 KERNEL_C := kernel/core/kernel.c kernel/core/syscall.c kernel/core/usermode.c arch/x86/gdt.c arch/x86/interrupts/idt.c \
 	kernel/drivers/video/vga.c kernel/graphics/graphics.c kernel/drivers/platform/serial.c kernel/drivers/input/keyboard.c kernel/drivers/input/mouse.c \
-	kernel/drivers/platform/timer.c kernel/drivers/platform/rtc.c kernel/drivers/platform/pci.c kernel/drivers/storage/ata.c \
+	kernel/drivers/platform/timer.c kernel/drivers/platform/rtc.c kernel/drivers/platform/pci.c kernel/drivers/platform/power.c kernel/drivers/storage/ata.c \
 	kernel/mm/paging.c kernel/mm/pmm.c kernel/mm/heap.c \
 	kernel/sched/scheduler.c kernel/fs/initrd.c kernel/fs/diskfs/diskfs.c \
 	kernel/input/input.c kernel/assets/assets.c kernel/shell/shell.c kernel/lib/util.c

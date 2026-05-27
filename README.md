@@ -9,7 +9,7 @@ Current kernel features:
 - VBE linear framebuffer graphics with VGA mode 13h fallback.
 - Double-buffered Windows-like desktop GUI with PNG-derived wallpaper and cursor
   assets, taskbar, Start button, CMOS-backed clock/date, app indicator, Terminal
-  shortcut, and window controls.
+  shortcut, Shutdown/Restart actions, and window controls.
 - COM1 serial logging.
 - IDT with CPU exception and IRQ stubs.
 - PIC remap with IRQ1 keyboard support.
@@ -47,6 +47,7 @@ Current kernel features:
 - Process lifecycle shell commands: `spawn`, `wait`, and `reap`.
 - Build-time PNG asset pipeline that converts `assets/source/wallpaper.png` and
   `assets/source/cursor_atlas.png` into compact diskfs runtime assets.
+- Smaller pointer cursor plus a text-entry `|` cursor variant while typing.
 - Graphics foundation with bootloader framebuffer handoff, high-memory
   framebuffer paging, framebuffer surface abstraction, drawing primitives, and
   bitmap-style font rendering.
@@ -251,4 +252,6 @@ F3 System Monitor
 F4 About
 F5 Open first diskfs file in Notepad
 Ctrl+S Save focused Notepad document
+Start > Shutdown powers off QEMU/ACPI-compatible environments
+Start > Restart reboots through the PS/2 controller
 ```

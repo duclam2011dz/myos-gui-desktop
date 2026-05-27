@@ -15,6 +15,7 @@ extern "C" {
 #include "heap.h"
 #include "input.h"
 #include "mouse.h"
+#include "power.h"
 #include "serial.h"
 #include "timer.h"
 }
@@ -51,6 +52,9 @@ private:
     int32_t last_files_click_index_ = -1;
     uint32_t last_files_click_tick_ = 0;
     uint32_t input_events_since_report_ = 0;
+    int32_t cursor_draw_x_ = 0;
+    int32_t cursor_draw_y_ = 0;
+    uint32_t cursor_text_until_tick_ = 0;
 
     void mark_dirty();
     void invalidate_rect(Rect rect);
@@ -58,6 +62,11 @@ private:
     void draw();
     void flush_dirty();
     void draw_cursor(graphics_surface *surface);
+    bool cursor_text_mode() const;
+    int32_t cursor_width() const;
+    int32_t cursor_height() const;
+    void invalidate_cursor_at(int32_t x, int32_t y);
+    void update_cursor_animation();
     HitResult hit_test(int32_t x, int32_t y) const;
     Window *window_for_app(AppId app);
     UtilityApp *utility_for_app(AppId app);
@@ -129,9 +138,62 @@ void GuiSystem::invalidate_window(const Window &window)
 
 void GuiSystem::draw_cursor(graphics_surface *surface)
 {
-    int32_t x = mouse_x();
-    int32_t y = mouse_y();
-    (void) assets_draw_cursor(surface, x, y);
+    (void) assets_draw_cursor(surface, cursor_draw_x_, cursor_draw_y_, cursor_text_mode());
+}
+
+bool GuiSystem::cursor_text_mode() const
+{
+    return (int32_t) (cursor_text_until_tick_ - timer_ticks()) > 0;
+}
+
+int32_t GuiSystem::cursor_width() const
+{
+    int32_t width = (int32_t) assets_cursor_width(cursor_text_mode());
+    return width > 0 ? width : 24;
+}
+
+int32_t GuiSystem::cursor_height() const
+{
+    int32_t height = (int32_t) assets_cursor_height(cursor_text_mode());
+    return height > 0 ? height : 24;
+}
+
+void GuiSystem::invalidate_cursor_at(int32_t x, int32_t y)
+{
+    invalidate_rect(Rect{x - 16, y - 16, cursor_width() + 32, cursor_height() + 32});
+}
+
+void GuiSystem::update_cursor_animation()
+{
+    int32_t target_x = mouse_x();
+    int32_t target_y = mouse_y();
+    int32_t dx = target_x - cursor_draw_x_;
+    int32_t dy = target_y - cursor_draw_y_;
+    if (dx == 0 && dy == 0) {
+        return;
+    }
+    invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
+    int32_t abs_dx = dx < 0 ? -dx : dx;
+    int32_t abs_dy = dy < 0 ? -dy : dy;
+    int32_t max_delta = max_i32(abs_dx, abs_dy);
+    int32_t step = max_delta / 3;
+    if (step < 1) {
+        step = 1;
+    }
+    if (step > 10) {
+        step = 10;
+    }
+    if (abs_dx <= step) {
+        cursor_draw_x_ = target_x;
+    } else {
+        cursor_draw_x_ += dx > 0 ? step : -step;
+    }
+    if (abs_dy <= step) {
+        cursor_draw_y_ = target_y;
+    } else {
+        cursor_draw_y_ += dy > 0 ? step : -step;
+    }
+    invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
 }
 
 void GuiSystem::draw()
@@ -241,6 +303,12 @@ HitResult GuiSystem::hit_test(int32_t x, int32_t y) const
         }
         if (Rect{menu.x + 28, menu.y + 56, menu.w - 32, 18}.contains(x, y)) {
             return HitResult{HitTarget::StartTerminal, AppId::About};
+        }
+        if (Rect{menu.x + 28, menu.y + 84, menu.w - 32, 18}.contains(x, y)) {
+            return HitResult{HitTarget::StartShutdown, AppId::None};
+        }
+        if (Rect{menu.x + 28, menu.y + 100, menu.w - 32, 18}.contains(x, y)) {
+            return HitResult{HitTarget::StartRestart, AppId::None};
         }
     }
     if (Rect{ICON_X, ICON_Y, ICON_W, ICON_H}.contains(x, y)) {
@@ -481,6 +549,14 @@ void GuiSystem::handle_left_release(int32_t x, int32_t y)
         open_app(release_hit.app);
         return;
     }
+    if (release_hit.target == HitTarget::StartShutdown) {
+        power_shutdown();
+        return;
+    }
+    if (release_hit.target == HitTarget::StartRestart) {
+        power_restart();
+        return;
+    }
     if (release_hit.target == HitTarget::DesktopIcon) {
         uint32_t now = timer_ticks();
         bool close_in_time = now - last_icon_click_tick_ <= DOUBLE_CLICK_TICKS;
@@ -537,6 +613,10 @@ void GuiSystem::handle_event(const gui_event &event)
         input_events_since_report_++;
         if (!event.pressed) {
             return;
+        }
+        if ((event.key >= ' ' && event.key <= '~') || event.key == '\b' || event.key == '\n') {
+            cursor_text_until_tick_ = timer_ticks() + 80;
+            invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
         }
         if (event.key == GUI_KEY_F1) {
             open_app(AppId::Terminal);
@@ -595,14 +675,7 @@ void GuiSystem::handle_event(const gui_event &event)
         if (event.pressed) {
             handle_mouse_drag(event.x, event.y);
         }
-        int32_t cursor_w = (int32_t) assets_cursor_width();
-        int32_t cursor_h = (int32_t) assets_cursor_height();
-        if (cursor_w <= 0 || cursor_h <= 0) {
-            cursor_w = 24;
-            cursor_h = 24;
-        }
-        invalidate_rect(Rect{event.x - event.dx - 8, event.y - event.dy - 8, cursor_w + 16, cursor_h + 16});
-        invalidate_rect(Rect{event.x - 8, event.y - 8, cursor_w + 16, cursor_h + 16});
+        invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
         return;
     }
     if (event.type == GUI_EVENT_TIMER_TICK) {
@@ -656,6 +729,9 @@ void GuiSystem::initialize()
     last_files_click_tick_ = 0;
     input_events_since_report_ = 0;
     assets_initialize();
+    cursor_draw_x_ = mouse_x();
+    cursor_draw_y_ = mouse_y();
+    cursor_text_until_tick_ = 0;
 
     serial_writestring("MyOS GUI: desktop initialized with no open apps.\n");
     serial_writestring("MyOS GUI: double buffering enabled.\n");
@@ -678,6 +754,7 @@ void GuiSystem::run()
             handle_event(event);
             drained++;
         }
+        update_cursor_animation();
 
         uint32_t second = timer_uptime_seconds();
         if (second != last_second) {
@@ -690,13 +767,7 @@ void GuiSystem::run()
         uint32_t tick = timer_ticks();
         if (tick - last_cursor_tick >= 20) {
             last_cursor_tick = tick;
-            int32_t cursor_w = (int32_t) assets_cursor_width();
-            int32_t cursor_h = (int32_t) assets_cursor_height();
-            if (cursor_w <= 0 || cursor_h <= 0) {
-                cursor_w = 24;
-                cursor_h = 24;
-            }
-            invalidate_rect(Rect{mouse_x() - 8, mouse_y() - 8, cursor_w + 16, cursor_h + 16});
+            invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
         }
 
         if (tick - last_input_report >= 100) {

@@ -15,10 +15,25 @@
       "width": 235,
       "height": 310
     },
-    "width": 32,
-    "height": 45,
+    "width": 24,
+    "height": 34,
     "format": "argb32",
-    "hotspot_x": 3,
-    "hotspot_y": 3
+    "hotspot_x": 2,
+    "hotspot_y": 2
+  },
+  "cursor_text": {
+    "source": "assets/source/cursor_atlas.png",
+    "output": "build/assets/cursor_text.myimg",
+    "crop": {
+      "x": 232,
+      "y": 580,
+      "width": 78,
+      "height": 250
+    },
+    "width": 8,
+    "height": 32,
+    "format": "argb32",
+    "hotspot_x": 4,
+    "hotspot_y": 16
   }
 }
