@@ -77,6 +77,7 @@ private:
     void close_app(AppId app);
     void toggle_maximize_app(AppId app);
     bool open_file_in_notepad(uint32_t file_index);
+    bool open_first_text_file_in_notepad();
     void maybe_open_file_from_explorer(int32_t x, int32_t y);
     bool click_matches_press(int32_t x, int32_t y) const;
     void handle_left_press(int32_t x, int32_t y);
@@ -466,6 +467,29 @@ bool GuiSystem::open_file_in_notepad(uint32_t file_index)
     return ok;
 }
 
+static bool file_name_looks_text(const char *name)
+{
+    uint32_t len = 0;
+    while (name[len] != '\0') {
+        len++;
+    }
+    if (len >= 4 && name[len - 4] == '.' && name[len - 3] == 't' && name[len - 2] == 'x' && name[len - 1] == 't') {
+        return true;
+    }
+    return len >= 5 && name[len - 5] == '/' && name[len - 4] == 'm' && name[len - 3] == 'o' &&
+           name[len - 2] == 't' && name[len - 1] == 'd';
+}
+
+bool GuiSystem::open_first_text_file_in_notepad()
+{
+    for (uint32_t i = 0; i < diskfs_file_count(); i++) {
+        if (file_name_looks_text(diskfs_file_name(i))) {
+            return open_file_in_notepad(i);
+        }
+    }
+    return false;
+}
+
 void GuiSystem::maybe_open_file_from_explorer(int32_t x, int32_t y)
 {
     int index = files_.file_index_at(x, y);
@@ -636,7 +660,7 @@ void GuiSystem::handle_event(const gui_event &event)
         }
         if (event.key == GUI_KEY_F5) {
             open_app(AppId::Files);
-            (void) open_file_in_notepad(0);
+            (void) open_first_text_file_in_notepad();
             return;
         }
         if (notepad_.open() && notepad_.window().focused) {
