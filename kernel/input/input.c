@@ -22,15 +22,18 @@ bool input_poll_event(struct gui_event *event)
         return false;
     }
 
-    char key;
-    if (keyboard_try_read_char(&key)) {
+    struct keyboard_event key_event;
+    if (keyboard_try_read_event(&key_event)) {
         event->type = GUI_EVENT_KEY;
-        event->key = key;
+        event->key = key_event.ascii;
+        event->keycode = key_event.keycode;
+        event->modifiers = key_event.modifiers;
         event->x = last_mouse_x;
         event->y = last_mouse_y;
         event->dx = 0;
         event->dy = 0;
-        event->pressed = true;
+        event->wheel_delta = 0;
+        event->pressed = key_event.pressed;
         event->ticks = 0;
         return true;
     }
@@ -39,6 +42,23 @@ bool input_poll_event(struct gui_event *event)
     bool left_down = mouse_left_down();
     int32_t x = mouse_x();
     int32_t y = mouse_y();
+
+    int32_t wheel = mouse_consume_wheel_delta();
+    if (wheel != 0) {
+        event->type = GUI_EVENT_MOUSE_SCROLL;
+        event->x = x;
+        event->y = y;
+        event->dx = 0;
+        event->dy = 0;
+        event->wheel_delta = wheel;
+        event->pressed = left_down;
+        event->key = 0;
+        event->keycode = 0;
+        event->modifiers = 0;
+        event->ticks = 0;
+        last_mouse_generation = generation;
+        return true;
+    }
 
     if (left_down != last_left_down) {
         last_left_down = left_down;
@@ -53,8 +73,11 @@ bool input_poll_event(struct gui_event *event)
         event->y = y;
         event->dx = x - last_mouse_x;
         event->dy = y - last_mouse_y;
+        event->wheel_delta = 0;
         event->pressed = left_down;
         event->key = 0;
+        event->keycode = 0;
+        event->modifiers = 0;
         event->ticks = 0;
         last_mouse_x = x;
         last_mouse_y = y;
@@ -67,8 +90,11 @@ bool input_poll_event(struct gui_event *event)
         event->y = y;
         event->dx = x - last_mouse_x;
         event->dy = y - last_mouse_y;
+        event->wheel_delta = 0;
         event->pressed = false;
         event->key = 0;
+        event->keycode = 0;
+        event->modifiers = 0;
         event->ticks = 0;
         last_left_down = false;
         last_mouse_x = x;
@@ -83,8 +109,11 @@ bool input_poll_event(struct gui_event *event)
         event->y = y;
         event->dx = x - last_mouse_x;
         event->dy = y - last_mouse_y;
+        event->wheel_delta = 0;
         event->pressed = left_down;
         event->key = 0;
+        event->keycode = 0;
+        event->modifiers = 0;
         event->ticks = 0;
         last_mouse_x = x;
         last_mouse_y = y;

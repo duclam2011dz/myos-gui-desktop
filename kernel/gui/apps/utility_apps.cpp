@@ -186,12 +186,15 @@ void UtilityApp::draw_monitor(graphics_surface *surface) const
 {
     int32_t x = window_.x + 14;
     int32_t y = window_.y + TITLEBAR_H + 16;
+    char fsck_report[48];
     draw_u32(surface, x, y, "UPTIME", timer_uptime_seconds());
     draw_u32(surface, x, y + 14, "TICKS", timer_ticks());
     draw_u32(surface, x, y + 28, "FREE PAGES", pmm_free_pages());
     draw_u32(surface, x, y + 42, "HEAP FREE", (uint32_t) heap_free_bytes());
     draw_u32(surface, x, y + 56, "SWITCHES", scheduler_switch_count());
     draw_u32(surface, x, y + 70, "PROCESSES", user_process_count());
+    fsck_report[0] = '\0';
+    draw_u32(surface, x, y + 84, "FSCK ERR", diskfs_fsck(fsck_report, sizeof(fsck_report)));
 }
 
 void UtilityApp::draw_about(graphics_surface *surface) const

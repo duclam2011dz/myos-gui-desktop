@@ -7,6 +7,7 @@
 #include "initrd.h"
 #include "keyboard.h"
 #include "paging.h"
+#include "pci.h"
 #include "pmm.h"
 #include "scheduler.h"
 #include "serial.h"
@@ -268,6 +269,72 @@ static void shell_command_write(const char *args)
     shell_write("Write passed.\n");
 }
 
+static void shell_command_delete(const char *path)
+{
+    shell_write(diskfs_delete_file(path) ? "Delete passed.\n" : "Delete failed.\n");
+}
+
+static void shell_command_rename(const char *args)
+{
+    char old_path[32];
+    uint32_t len = 0;
+    while (args[len] != '\0' && args[len] != ' ' && len + 1 < sizeof(old_path)) {
+        old_path[len] = args[len];
+        len++;
+    }
+    old_path[len] = '\0';
+    if (len == 0 || args[len] != ' ') {
+        shell_write("Usage: rename <old> <new>\n");
+        return;
+    }
+    shell_write(diskfs_rename_file(old_path, args + len + 1) ? "Rename passed.\n" : "Rename failed.\n");
+}
+
+static void shell_command_truncate(const char *args)
+{
+    char path[32];
+    uint32_t len = 0;
+    while (args[len] != '\0' && args[len] != ' ' && len + 1 < sizeof(path)) {
+        path[len] = args[len];
+        len++;
+    }
+    path[len] = '\0';
+    if (len == 0 || args[len] != ' ') {
+        shell_write("Usage: truncate <path> <size>\n");
+        return;
+    }
+    shell_write(diskfs_truncate_file(path, parse_u32(args + len + 1)) ? "Truncate passed.\n" : "Truncate failed.\n");
+}
+
+static void shell_command_fsck(void)
+{
+    char report[160];
+    uint32_t errors = diskfs_fsck(report, sizeof(report));
+    shell_write(report);
+    shell_print_u32_line("fsck errors=", errors);
+}
+
+static void shell_command_pci(void)
+{
+    shell_print_u32_line("PCI devices=", pci_device_count());
+    for (uint32_t i = 0; i < pci_device_count(); i++) {
+        char value[11];
+        shell_write("PCI ");
+        u32_to_dec(i, value, sizeof(value));
+        shell_write(value);
+        shell_write(": vendor=");
+        u32_to_hex(pci_device_vendor(i), value);
+        shell_write(value);
+        shell_write(" device=");
+        u32_to_hex(pci_device_id(i), value);
+        shell_write(value);
+        shell_write(" class=");
+        u32_to_hex(((uint32_t) pci_device_class(i) << 8) | pci_device_subclass(i), value);
+        shell_write(value);
+        shell_write("\n");
+    }
+}
+
 static void shell_command_regs(void)
 {
     uint32_t cr0;
@@ -423,7 +490,7 @@ static void shell_execute(const char *line)
     }
 
     if (kstrcmp(line, "help") == 0) {
-        shell_write("Commands: help clear about mem regs ticks uptime heaptest pagingtest usertest run spawn gfx tasks procs wait reap yield disk ls cat write reboot fault\n");
+        shell_write("Commands: help clear about mem regs ticks uptime heaptest pagingtest usertest run spawn gfx tasks procs wait reap yield disk ls cat write delete rename truncate fsck pci reboot fault\n");
         return;
     }
 
@@ -531,6 +598,31 @@ static void shell_execute(const char *line)
 
     if (line[0] == 'w' && line[1] == 'r' && line[2] == 'i' && line[3] == 't' && line[4] == 'e' && line[5] == ' ') {
         shell_command_write(line + 6);
+        return;
+    }
+
+    if (line[0] == 'd' && line[1] == 'e' && line[2] == 'l' && line[3] == 'e' && line[4] == 't' && line[5] == 'e' && line[6] == ' ') {
+        shell_command_delete(line + 7);
+        return;
+    }
+
+    if (line[0] == 'r' && line[1] == 'e' && line[2] == 'n' && line[3] == 'a' && line[4] == 'm' && line[5] == 'e' && line[6] == ' ') {
+        shell_command_rename(line + 7);
+        return;
+    }
+
+    if (line[0] == 't' && line[1] == 'r' && line[2] == 'u' && line[3] == 'n' && line[4] == 'c' && line[5] == 'a' && line[6] == 't' && line[7] == 'e' && line[8] == ' ') {
+        shell_command_truncate(line + 9);
+        return;
+    }
+
+    if (kstrcmp(line, "fsck") == 0) {
+        shell_command_fsck();
+        return;
+    }
+
+    if (kstrcmp(line, "pci") == 0) {
+        shell_command_pci();
         return;
     }
 

@@ -16,8 +16,8 @@ CROSS_GCC_INCLUDE := $(shell $(CC) -print-file-name=include)
 
 BUILD_DIR := build
 STAGE2_SECTORS := 4
-KERNEL_SECTORS := 192
-FS_SECTORS := 32
+KERNEL_SECTORS := 256
+FS_SECTORS := 4096
 FS_START_LBA := $(shell echo $$((1 + $(STAGE2_SECTORS) + $(KERNEL_SECTORS))))
 BOOT_BIN := $(BUILD_DIR)/boot.bin
 STAGE2_BIN := $(BUILD_DIR)/stage2.bin
@@ -25,6 +25,8 @@ KERNEL_ELF := $(BUILD_DIR)/kernel.elf
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 FS_IMG := $(BUILD_DIR)/fs.img
 OS_IMAGE := $(BUILD_DIR)/myos.img
+ASSET_MANIFEST := assets/manifest.json
+ASSET_FILES := $(BUILD_DIR)/assets/wallpaper.myimg $(BUILD_DIR)/assets/cursor_pointer.myimg
 
 CFLAGS := -std=gnu11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector \
 	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
@@ -37,11 +39,11 @@ LDFLAGS := -nostdlib -T linker.ld
 
 KERNEL_ASM := arch/x86/boot/entry.asm arch/x86/interrupts/isr.asm arch/x86/switch.asm arch/x86/gdt_flush.asm arch/x86/usermode.asm
 KERNEL_C := kernel/core/kernel.c kernel/core/syscall.c kernel/core/usermode.c arch/x86/gdt.c arch/x86/interrupts/idt.c \
-	kernel/drivers/vga.c kernel/graphics/graphics.c kernel/drivers/serial.c kernel/drivers/keyboard.c kernel/drivers/mouse.c kernel/drivers/timer.c \
-	kernel/drivers/ata.c \
+	kernel/drivers/video/vga.c kernel/graphics/graphics.c kernel/drivers/platform/serial.c kernel/drivers/input/keyboard.c kernel/drivers/input/mouse.c \
+	kernel/drivers/platform/timer.c kernel/drivers/platform/rtc.c kernel/drivers/platform/pci.c kernel/drivers/storage/ata.c \
 	kernel/mm/paging.c kernel/mm/pmm.c kernel/mm/heap.c \
-	kernel/sched/scheduler.c kernel/fs/initrd.c kernel/fs/diskfs.c \
-	kernel/input/input.c kernel/shell/shell.c kernel/lib/util.c
+	kernel/sched/scheduler.c kernel/fs/initrd.c kernel/fs/diskfs/diskfs.c \
+	kernel/input/input.c kernel/assets/assets.c kernel/shell/shell.c kernel/lib/util.c
 KERNEL_CPP := kernel/gui/core/gui.cpp kernel/gui/wm/window_manager.cpp kernel/gui/desktop/desktop.cpp \
 	kernel/gui/apps/terminal.cpp kernel/gui/apps/utility_apps.cpp kernel/gui/apps/notepad.cpp
 KERNEL_OBJS := $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM)) \
@@ -83,8 +85,11 @@ $(KERNEL_BIN): $(KERNEL_ELF)
 	@test $$(stat -c%s $@) -le $$(($(KERNEL_SECTORS) * 512)) || \
 		(echo "Kernel is larger than the $(KERNEL_SECTORS) sectors loaded by stage2"; exit 1)
 
-$(FS_IMG): scripts/mkfs.py | $(BUILD_DIR)
-	python3 scripts/mkfs.py $@
+$(ASSET_FILES): tools/build/png_asset_pack.py $(ASSET_MANIFEST) assets/source/wallpaper.png assets/source/cursor_atlas.png | $(BUILD_DIR)
+	python3 tools/build/png_asset_pack.py $(ASSET_MANIFEST)
+
+$(FS_IMG): tools/build/mkfs.py $(ASSET_FILES) | $(BUILD_DIR)
+	python3 tools/build/mkfs.py $@
 
 $(OS_IMAGE): $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_BIN) $(FS_IMG)
 	dd if=/dev/zero of=$@ bs=512 count=$$(($(KERNEL_SECTORS) + $(STAGE2_SECTORS) + $(FS_SECTORS) + 1)) status=none
@@ -107,16 +112,16 @@ debug-gui: $(OS_IMAGE)
 	$(QEMU) -display $(QEMU_DISPLAY) -drive format=raw,file=$(OS_IMAGE) -serial file:$(BUILD_DIR)/debug-serial.log -monitor unix:/tmp/myos-debug-monitor.sock,server,nowait -S -s
 
 check: $(OS_IMAGE)
-	sh scripts/smoke-test.sh $(OS_IMAGE)
+	sh tools/test/smoke-test.sh $(OS_IMAGE)
 
 test: check-size check test-shell test-gui
 	@echo "All tests passed"
 
 test-shell: $(OS_IMAGE)
-	python3 scripts/shell-test.py $(OS_IMAGE)
+	python3 tools/test/shell-test.py $(OS_IMAGE)
 
 test-gui: $(OS_IMAGE)
-	python3 scripts/gui-test.py $(OS_IMAGE)
+	python3 tools/test/gui-test.py $(OS_IMAGE)
 
 check-size: $(STAGE2_BIN) $(KERNEL_BIN) $(FS_IMG)
 	@test $$(stat -c%s $(STAGE2_BIN)) -eq $$(($(STAGE2_SECTORS) * 512))
@@ -125,11 +130,11 @@ check-size: $(STAGE2_BIN) $(KERNEL_BIN) $(FS_IMG)
 	@echo "Image sizes: ok"
 
 ci: tools all check-size check lint
-	python3 -B -m py_compile scripts/mkfs.py scripts/shell-test.py scripts/gui-test.py scripts/gen-compile-commands.py
+	python3 -B -m py_compile tools/build/mkfs.py tools/build/png_asset_pack.py tools/test/shell-test.py tools/test/gui-test.py tools/dev/gen-compile-commands.py
 	@echo "CI checks passed"
 
 compile-commands:
-	python3 scripts/gen-compile-commands.py "$(CC)" '$(CFLAGS)' "$(CXX)" '$(CXXFLAGS)' $(KERNEL_C) $(KERNEL_CPP)
+	python3 tools/dev/gen-compile-commands.py "$(CC)" '$(CFLAGS)' "$(CXX)" '$(CXXFLAGS)' $(KERNEL_C) $(KERNEL_CPP)
 
 lint: compile-commands
 	@if command -v clang-tidy >/dev/null; then \

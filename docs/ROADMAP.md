@@ -3,16 +3,18 @@
 MyOS currently has a BIOS boot sector plus stage2 loader, E820 memory handoff,
 VBE linear framebuffer graphics with VGA mode 13h fallback, high-memory
 framebuffer paging, a pixel/font renderer, freestanding C++ GUI modules,
-double-buffered Windows-like desktop GUI, PS/2 keyboard and mouse input, a normalized GUI input event layer, a taskbar
-with Start button, clock/date, app indicator, wallpaper, compact OS-rendered
-mouse cursor, Terminal shortcut, File Explorer, Notepad text editor, System
+double-buffered Windows-like desktop GUI, PS/2 keyboard and mouse input, a
+normalized GUI input event layer, a taskbar with Start button, CMOS-backed
+clock/date, app indicator, PNG-derived wallpaper and cursor assets, Terminal
+shortcut, File Explorer, Notepad text editor, System
 Monitor, About app, window controls,
 32-bit protected mode, kernel-owned GDT/TSS, ring 3 user mode, `int 0x80`
 syscalls, MEXE and ELF32 user programs loaded from diskfs, IDT/IRQ handling,
 PIT IRQ0, full IRQ-return preemptive task switching, COM1 logging, 128 MiB
 identity paging, per-process user address spaces with CR3 switching, dynamic
 page map/unmap APIs, E820-backed PMM, hardened PMM-backed heap, ATA PIO
-reads/writes, a path-aware disk-backed filesystem image with initrd fallback,
+reads/writes, PCI enumeration, a directory-aware disk-backed filesystem image
+with initrd fallback,
 automated QEMU GUI terminal and screenshot tests, optional clang lint/format
 targets, compile command generation, CI checks, disassembly output, symbol dumps,
 and exception diagnostics.
@@ -85,6 +87,30 @@ and exception diagnostics.
     overlapping extents during mount.
   - Diskfs write paths validate names and support zero-length file contents
     without corrupting directory metadata.
+- Asset pipeline and project structure:
+  - Build-time PNG decoding now converts `assets/source/wallpaper.png` and
+    `assets/source/cursor_atlas.png` into compact `.myimg` runtime assets.
+  - Diskfs packages `/assets/wallpaper.myimg` and
+    `/assets/cursor_pointer.myimg`; the desktop renders those assets instead of
+    the old hard-coded gradient wallpaper and bitmask cursor.
+  - Source folders are grouped by responsibility: build/test/dev tools live
+    under `tools/`, drivers under `kernel/drivers/{input,platform,storage,video}`,
+    assets under `kernel/assets`, and diskfs under `kernel/fs/diskfs`.
+- Filesystem and reliability:
+  - Diskfs v2 now uses a superblock, sector allocation bitmap, inode table,
+    directory-aware path traversal, and a larger 4096-sector filesystem image.
+  - Diskfs adds a small dirty metadata journal marker, cached sectors with dirty
+    writeback, explicit flush, and fsck validation for bounds, overlaps, and
+    bitmap mismatches.
+  - Truncate, delete, rename, and fsck are available through kernel APIs and
+    shell/GUI Terminal commands while preserving the old read/write APIs.
+- Driver and platform polish:
+  - Keyboard input now exposes press/release events, keycodes, ASCII, and
+    modifiers while keeping the old character stream for the shell.
+  - PS/2 mouse init negotiates IntelliMouse wheel packets and exposes wheel,
+    middle, and right button state; GUI Terminal can scroll from wheel events.
+  - CMOS RTC provides real taskbar wall-clock time.
+  - PCI config-space scanning records devices and exposes a `pci` shell command.
 
 ## Recommended Next Updates
 
@@ -116,21 +142,25 @@ and exception diagnostics.
 
 3. Terminal UX
    - Add text selection and copy/paste buffers.
-   - Add mouse wheel and scrollbar support.
+   - Add visible scrollbars and tune wheel acceleration.
    - Add configurable font scale for high-DPI modes.
 
 4. Driver/platform polish
-   - Add richer PS/2 scancode handling, key release events, modifiers, and mouse
-     wheel packet support.
-   - Add CMOS time for real wall-clock date instead of the demo fixed date.
-   - Add PCI enumeration as a base for better disk/network drivers.
+   - Current state: keyboard event ring, modifiers, release events,
+     IntelliMouse wheel packets, CMOS time, and PCI enumeration are implemented.
+   - Next platform work: identify PCI IDE/class drivers, add controller-specific
+     driver binding, and surface PCI device names in GUI diagnostics.
+   - Next input work: add Alt-Tab, text selection shortcuts, and full scancode
+     set coverage for extended navigation keys.
 
 5. Filesystem and reliability
-   - Replace flat slash path strings with real directory records.
-   - Add a sector cache and dirty block tracking.
-   - Add truncate/delete/rename and consistency checks for interrupted writes.
-   - Add a small fsck command that reports diskfs validation errors through GUI
-     and serial output.
+   - Current state: diskfs v2 has directory-aware paths, inodes, bitmap
+     allocation, dirty sector cache, metadata journal marker, truncate/delete/
+     rename, and fsck reporting.
+   - Next reliability work: replace the journal marker with replayable metadata
+     records and add automated corruption-image tests.
+   - Next filesystem work: support non-contiguous extents and directory listing
+     filters so large files no longer require contiguous sector runs.
 
 ## Suggested Immediate Milestone
 

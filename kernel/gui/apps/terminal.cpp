@@ -4,6 +4,7 @@ extern "C" {
 #include "diskfs.h"
 #include "gui_event.h"
 #include "heap.h"
+#include "pci.h"
 #include "pmm.h"
 #include "scheduler.h"
 #include "serial.h"
@@ -256,6 +257,20 @@ void TerminalApp::focus(uint32_t z)
     window_.z = z;
 }
 
+void TerminalApp::scroll(int32_t delta)
+{
+    if (delta > 0) {
+        if (scroll_ + (uint32_t) delta < line_count_) {
+            scroll_ += (uint32_t) delta;
+        } else {
+            scroll_ = line_count_ > 0 ? line_count_ - 1 : 0;
+        }
+    } else if (delta < 0) {
+        uint32_t amount = (uint32_t) -delta;
+        scroll_ = amount > scroll_ ? 0 : scroll_ - amount;
+    }
+}
+
 bool TerminalApp::hit(int32_t x, int32_t y) const
 {
     return window_.visible() && window_.rect().contains(x, y);
@@ -327,7 +342,7 @@ void TerminalApp::execute_command(const char *line)
 
     push_history(line);
     if (kstrcmp(line, "help") == 0) {
-        print("Commands: help clear about ticks uptime ls cat run procs tasks mem\n");
+        print("Commands: help clear about ticks uptime ls cat write delete rename truncate fsck pci run procs tasks mem\n");
         print("myos> ");
         return;
     }
@@ -391,6 +406,73 @@ void TerminalApp::execute_command(const char *line)
                 print("\n");
             }
         }
+        print("myos> ");
+        return;
+    }
+    if (line[0] == 'w' && line[1] == 'r' && line[2] == 'i' && line[3] == 't' && line[4] == 'e' && line[5] == ' ') {
+        const char *args = line + 6;
+        char path[32];
+        uint32_t len = 0;
+        while (args[len] != '\0' && args[len] != ' ' && len + 1 < sizeof(path)) {
+            path[len] = args[len];
+            len++;
+        }
+        path[len] = '\0';
+        if (len == 0 || args[len] != ' ' || !diskfs_write_file(path, args + len + 1, (uint32_t) kstrlen(args + len + 1))) {
+            print("Write failed.\n");
+        } else {
+            print("Write passed.\n");
+        }
+        print("myos> ");
+        return;
+    }
+    if (line[0] == 'd' && line[1] == 'e' && line[2] == 'l' && line[3] == 'e' && line[4] == 't' && line[5] == 'e' && line[6] == ' ') {
+        print(diskfs_delete_file(line + 7) ? "Delete passed.\n" : "Delete failed.\n");
+        print("myos> ");
+        return;
+    }
+    if (line[0] == 'r' && line[1] == 'e' && line[2] == 'n' && line[3] == 'a' && line[4] == 'm' && line[5] == 'e' && line[6] == ' ') {
+        const char *args = line + 7;
+        char old_path[32];
+        uint32_t len = 0;
+        while (args[len] != '\0' && args[len] != ' ' && len + 1 < sizeof(old_path)) {
+            old_path[len] = args[len];
+            len++;
+        }
+        old_path[len] = '\0';
+        print(len > 0 && args[len] == ' ' && diskfs_rename_file(old_path, args + len + 1) ? "Rename passed.\n" : "Rename failed.\n");
+        print("myos> ");
+        return;
+    }
+    if (line[0] == 't' && line[1] == 'r' && line[2] == 'u' && line[3] == 'n' && line[4] == 'c' && line[5] == 'a' && line[6] == 't' && line[7] == 'e' && line[8] == ' ') {
+        const char *args = line + 9;
+        char path[32];
+        uint32_t len = 0;
+        while (args[len] != '\0' && args[len] != ' ' && len + 1 < sizeof(path)) {
+            path[len] = args[len];
+            len++;
+        }
+        path[len] = '\0';
+        uint32_t size = 0;
+        const char *size_text = args + len + 1;
+        while (*size_text >= '0' && *size_text <= '9') {
+            size = size * 10 + (uint32_t) (*size_text - '0');
+            size_text++;
+        }
+        print(len > 0 && args[len] == ' ' && diskfs_truncate_file(path, size) ? "Truncate passed.\n" : "Truncate failed.\n");
+        print("myos> ");
+        return;
+    }
+    if (kstrcmp(line, "fsck") == 0) {
+        char report[96];
+        uint32_t errors = diskfs_fsck(report, sizeof(report));
+        print(report);
+        print_u32("fsck errors=", errors);
+        print("myos> ");
+        return;
+    }
+    if (kstrcmp(line, "pci") == 0) {
+        print_u32("PCI devices=", pci_device_count());
         print("myos> ");
         return;
     }

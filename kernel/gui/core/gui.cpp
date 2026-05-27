@@ -7,6 +7,7 @@
 #include "../wm/window_manager.hpp"
 
 extern "C" {
+#include "assets.h"
 #include "diskfs.h"
 #include "graphics.h"
 #include "gui.h"
@@ -130,21 +131,7 @@ void GuiSystem::draw_cursor(graphics_surface *surface)
 {
     int32_t x = mouse_x();
     int32_t y = mouse_y();
-    static const uint8_t cursor[8] = {
-        0x80, 0xC0, 0xE0, 0xF0, 0xD8, 0x8C, 0x04, 0x00,
-    };
-
-    for (uint32_t row = 0; row < 8; row++) {
-        for (uint32_t col = 0; col < 6; col++) {
-            if ((cursor[row] & (0x80 >> col)) != 0) {
-                int32_t px = x + (int32_t) col;
-                int32_t py = y + (int32_t) row;
-                if (px >= 0 && py >= 0 && px < (int32_t) surface->width && py < (int32_t) surface->height) {
-                    graphics_put_pixel(surface, (uint32_t) px, (uint32_t) py, 15);
-                }
-            }
-        }
-    }
+    (void) assets_draw_cursor(surface, x, y);
 }
 
 void GuiSystem::draw()
@@ -548,6 +535,9 @@ void GuiSystem::handle_event(const gui_event &event)
 {
     if (event.type == GUI_EVENT_KEY) {
         input_events_since_report_++;
+        if (!event.pressed) {
+            return;
+        }
         if (event.key == GUI_KEY_F1) {
             open_app(AppId::Terminal);
             return;
@@ -583,6 +573,14 @@ void GuiSystem::handle_event(const gui_event &event)
         mark_dirty();
         return;
     }
+    if (event.type == GUI_EVENT_MOUSE_SCROLL) {
+        input_events_since_report_++;
+        if (terminal_.open() && terminal_.window().focused) {
+            terminal_.scroll(event.wheel_delta > 0 ? -1 : 1);
+        }
+        mark_dirty();
+        return;
+    }
     if (event.type == GUI_EVENT_MOUSE_BUTTON) {
         input_events_since_report_++;
         if (event.pressed) {
@@ -597,8 +595,14 @@ void GuiSystem::handle_event(const gui_event &event)
         if (event.pressed) {
             handle_mouse_drag(event.x, event.y);
         }
-        invalidate_rect(Rect{event.x - event.dx - 8, event.y - event.dy - 8, 24, 24});
-        invalidate_rect(Rect{event.x - 8, event.y - 8, 24, 24});
+        int32_t cursor_w = (int32_t) assets_cursor_width();
+        int32_t cursor_h = (int32_t) assets_cursor_height();
+        if (cursor_w <= 0 || cursor_h <= 0) {
+            cursor_w = 24;
+            cursor_h = 24;
+        }
+        invalidate_rect(Rect{event.x - event.dx - 8, event.y - event.dy - 8, cursor_w + 16, cursor_h + 16});
+        invalidate_rect(Rect{event.x - 8, event.y - 8, cursor_w + 16, cursor_h + 16});
         return;
     }
     if (event.type == GUI_EVENT_TIMER_TICK) {
@@ -651,6 +655,7 @@ void GuiSystem::initialize()
     last_files_click_index_ = -1;
     last_files_click_tick_ = 0;
     input_events_since_report_ = 0;
+    assets_initialize();
 
     serial_writestring("MyOS GUI: desktop initialized with no open apps.\n");
     serial_writestring("MyOS GUI: double buffering enabled.\n");
@@ -685,7 +690,13 @@ void GuiSystem::run()
         uint32_t tick = timer_ticks();
         if (tick - last_cursor_tick >= 20) {
             last_cursor_tick = tick;
-            invalidate_rect(Rect{mouse_x() - 8, mouse_y() - 8, 24, 24});
+            int32_t cursor_w = (int32_t) assets_cursor_width();
+            int32_t cursor_h = (int32_t) assets_cursor_height();
+            if (cursor_w <= 0 || cursor_h <= 0) {
+                cursor_w = 24;
+                cursor_h = 24;
+            }
+            invalidate_rect(Rect{mouse_x() - 8, mouse_y() - 8, cursor_w + 16, cursor_h + 16});
         }
 
         if (tick - last_input_report >= 100) {

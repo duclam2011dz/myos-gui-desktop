@@ -1,6 +1,8 @@
 #include "desktop.hpp"
 
 extern "C" {
+#include "assets.h"
+#include "rtc.h"
 #include "timer.h"
 }
 
@@ -8,24 +10,8 @@ namespace myos::gui {
 
 static void draw_wallpaper(graphics_surface *surface, const Metrics &metrics)
 {
-    for (uint32_t y = 0; y < metrics.height; y++) {
-        uint32_t mix = metrics.height > 1 ? (y * 255) / (metrics.height - 1) : 0;
-        uint32_t top = COLOR_DESKTOP_TOP;
-        uint32_t bottom = COLOR_DESKTOP_BOTTOM;
-        uint32_t r = (((top >> 16) & 0xFF) * (255 - mix) + ((bottom >> 16) & 0xFF) * mix) / 255;
-        uint32_t g = (((top >> 8) & 0xFF) * (255 - mix) + ((bottom >> 8) & 0xFF) * mix) / 255;
-        uint32_t b = ((top & 0xFF) * (255 - mix) + (bottom & 0xFF) * mix) / 255;
-        graphics_fill_rect(surface, 0, y, metrics.width, 1, (r << 16) | (g << 8) | b);
-    }
-
-    uint32_t panel_w = metrics.width / 3;
-    uint32_t panel_h = metrics.height / 4;
-    if (panel_w > 90 && panel_h > 60) {
-        graphics_draw_rect(surface, metrics.width - panel_w - 16, 18, panel_w, panel_h, 0x00436C7C);
-        for (uint32_t i = 0; i < 5; i++) {
-            graphics_fill_rect(surface, metrics.width - panel_w - 12 + i * 6, 22 + i * 5,
-                               panel_w - 10 - i * 10, 1, 0x00284752);
-        }
+    if (!assets_draw_wallpaper(surface)) {
+        graphics_fill_rect(surface, 0, 0, metrics.width, metrics.height, COLOR_DESKTOP_BOTTOM);
     }
 }
 
@@ -108,9 +94,14 @@ static void draw_taskbar(graphics_surface *surface, const Metrics &metrics, bool
         draw_task_button(surface, metrics, TASK_BUTTON_X + (TASK_BUTTON_W + 6) * 2, "MONITOR", monitor_minimized);
     }
 
+    struct rtc_datetime now;
+    bool has_rtc = rtc_read_datetime(&now);
     uint32_t seconds = timer_uptime_seconds();
-    uint32_t minutes = (seconds / 60) % 60;
-    uint32_t hours = (seconds / 3600) % 24;
+    uint32_t minutes = has_rtc ? now.minute : (seconds / 60) % 60;
+    uint32_t hours = has_rtc ? now.hour : (seconds / 3600) % 24;
+    uint32_t day = has_rtc ? now.day : 25;
+    uint32_t month = has_rtc ? now.month : 5;
+    uint32_t year = has_rtc ? now.year : 2026;
     char clock[18];
     clock[0] = (char) ('0' + (hours / 10));
     clock[1] = (char) ('0' + (hours % 10));
@@ -118,16 +109,16 @@ static void draw_taskbar(graphics_surface *surface, const Metrics &metrics, bool
     clock[3] = (char) ('0' + (minutes / 10));
     clock[4] = (char) ('0' + (minutes % 10));
     clock[5] = ' ';
-    clock[6] = '2';
-    clock[7] = '5';
+    clock[6] = (char) ('0' + (day / 10));
+    clock[7] = (char) ('0' + (day % 10));
     clock[8] = '/';
-    clock[9] = '0';
-    clock[10] = '5';
+    clock[9] = (char) ('0' + (month / 10));
+    clock[10] = (char) ('0' + (month % 10));
     clock[11] = '/';
-    clock[12] = '2';
-    clock[13] = '0';
-    clock[14] = '2';
-    clock[15] = '6';
+    clock[12] = (char) ('0' + ((year / 1000) % 10));
+    clock[13] = (char) ('0' + ((year / 100) % 10));
+    clock[14] = (char) ('0' + ((year / 10) % 10));
+    clock[15] = (char) ('0' + (year % 10));
     clock[16] = '\0';
     uint32_t clock_x = metrics.width > 108 ? metrics.width - 104 : 216;
     graphics_draw_string(surface, clock_x, metrics.height - metrics.taskbar_h + 7, clock, 15, COLOR_TASKBAR);

@@ -10,6 +10,9 @@ void mouse_handle_interrupt(void);
 int32_t mouse_x(void);
 int32_t mouse_y(void);
 bool mouse_left_down(void);
+bool mouse_right_down(void);
+bool mouse_middle_down(void);
+int32_t mouse_consume_wheel_delta(void);
 uint32_t mouse_generation(void);
 bool mouse_consume_click(int32_t *x, int32_t *y);
 

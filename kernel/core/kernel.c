@@ -9,7 +9,9 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "paging.h"
+#include "pci.h"
 #include "pmm.h"
+#include "rtc.h"
 #include "scheduler.h"
 #include "serial.h"
 #include "shell.h"
@@ -38,6 +40,8 @@ void kernel_main(uint32_t boot_magic, const struct e820_entry *e820_entries, uin
     scheduler_initialize();
     initrd_initialize();
     diskfs_initialize(FS_START_LBA);
+    rtc_initialize();
+    pci_initialize();
     idt_initialize();
     timer_initialize(100);
     keyboard_initialize();

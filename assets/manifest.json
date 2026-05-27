@@ -1,0 +1,24 @@
+{
+  "wallpaper": {
+    "source": "assets/source/wallpaper.png",
+    "output": "build/assets/wallpaper.myimg",
+    "width": 800,
+    "height": 450,
+    "format": "rgb565"
+  },
+  "cursor_pointer": {
+    "source": "assets/source/cursor_atlas.png",
+    "output": "build/assets/cursor_pointer.myimg",
+    "crop": {
+      "x": 150,
+      "y": 100,
+      "width": 235,
+      "height": 310
+    },
+    "width": 32,
+    "height": 45,
+    "format": "argb32",
+    "hotspot_x": 3,
+    "hotspot_y": 3
+  }
+}

@@ -101,7 +101,7 @@ def main():
             "MyOS graphics: VBE linear framebuffer enabled.",
             "MyOS GUI: Terminal opened.",
             "MyOS GUI terminal: command entered.",
-            "Commands: help clear about ticks uptime ls cat run procs tasks mem",
+            "Commands: help clear about ticks uptime ls cat write delete rename truncate fsck pci run procs tasks mem",
             "MyOS GUI double-buffered desktop.",
             "Window manager: drag focus min max resize.",
             "Timer ticks=",

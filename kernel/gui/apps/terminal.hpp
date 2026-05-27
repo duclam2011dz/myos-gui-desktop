@@ -24,6 +24,7 @@ public:
     void toggle_maximize(const Metrics &metrics, uint32_t z);
     void close();
     void focus(uint32_t z);
+    void scroll(int32_t delta);
     void handle_key(char key, const Metrics &metrics, uint32_t z);
     bool hit(int32_t x, int32_t y) const;
 

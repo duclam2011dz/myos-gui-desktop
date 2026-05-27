@@ -7,15 +7,17 @@ Current kernel features:
 - BIOS boot sector loads a stage2 loader, then stage2 loads the flat kernel.
 - 32-bit protected mode.
 - VBE linear framebuffer graphics with VGA mode 13h fallback.
-- Double-buffered Windows-like desktop GUI with wallpaper, taskbar, Start button,
-  clock/date, app indicator, Terminal shortcut, window controls, and compact
-  OS-rendered mouse cursor.
+- Double-buffered Windows-like desktop GUI with PNG-derived wallpaper and cursor
+  assets, taskbar, Start button, CMOS-backed clock/date, app indicator, Terminal
+  shortcut, and window controls.
 - COM1 serial logging.
 - IDT with CPU exception and IRQ stubs.
 - PIC remap with IRQ1 keyboard support.
 - Identity-mapped paging for the first 128 MiB.
-- Buffered keyboard input layer with shift/caps support.
-- PS/2 mouse driver with IRQ12 packet handling.
+- Buffered keyboard input layer with press/release events, keycodes, modifiers,
+  shift/caps support, and a shell-compatible character stream.
+- PS/2 mouse driver with IRQ12 packet handling, IntelliMouse wheel packets, and
+  middle/right button state.
 - Normalized GUI input event layer over keyboard and mouse state.
 - GUI Terminal app rendered through the framebuffer with drag/focus, minimize,
   maximize/restore, resize, close, scrollback, command history, and cursor blink.
@@ -28,7 +30,10 @@ Current kernel features:
 - Task states and interrupt-frame context switching for kernel/user frames.
 - Per-process user address spaces with CR3 switching for ring 3 programs.
 - ATA PIO sector read/write.
-- Disk-backed writable filesystem image with initrd fallback.
+- PCI bus enumeration and CMOS RTC wall-clock reads.
+- Disk-backed writable diskfs v2 image with initrd fallback, real directory
+  traversal, inode metadata, bitmap allocation, dirty sector cache, metadata
+  journal marker, and fsck validation.
 - Dynamic paging APIs: `paging_map_page`, `paging_unmap_page`, `paging_get_physical`.
 - Heap hardening: aligned allocations, double-free accounting, whole-region PMM release.
 - Ring 3 user mode with GDT/TSS, `int 0x80` syscall gate, and shell `usertest`.
@@ -37,8 +42,11 @@ Current kernel features:
 - ELF32 loading from slash paths such as `run /bin/hello.elf`.
 - User process table with PID, process state, exit code, and per-process file descriptors.
 - User syscall layer with `write`, `exit`, `yield`, `uptime`, `open`, `read`, `close`, `getpid`, `waitpid`, and `writefile`.
-- Path-aware diskfs reads/writes with offset-based file access for user descriptors.
+- Directory-aware diskfs reads/writes with offset-based file access for user descriptors.
+- Diskfs truncate/delete/rename/fsck commands and APIs.
 - Process lifecycle shell commands: `spawn`, `wait`, and `reap`.
+- Build-time PNG asset pipeline that converts `assets/source/wallpaper.png` and
+  `assets/source/cursor_atlas.png` into compact diskfs runtime assets.
 - Graphics foundation with bootloader framebuffer handoff, high-memory
   framebuffer paging, framebuffer surface abstraction, drawing primitives, and
   bitmap-style font rendering.
@@ -84,7 +92,8 @@ thread-safe statics, and libstdc++ runtime use disabled.
 make
 ```
 
-This creates `build/myos.img`, a raw bootable disk image.
+This decodes the PNG assets, creates `build/fs.img`, and writes
+`build/myos.img`, a raw bootable disk image.
 
 ## Run
 
@@ -114,8 +123,8 @@ For a deeper automated shell test:
 make test-shell
 ```
 
-This uses the QEMU monitor to open the GUI Terminal and type commands: `help`,
-`about`, `ticks`, `uptime`, `ls`, and `run /bin/hello.elf`, then verifies serial
+This uses the QEMU monitor to open the GUI Terminal and type commands such as
+`help`, `ls`, `fsck`, `pci`, and `run /bin/hello.elf`, then verifies serial
 markers for GUI command output and user program execution.
 
 For screenshot-backed GUI regression testing:
@@ -152,23 +161,33 @@ make symbols
 ## Structure
 
 ```text
-arch/x86/boot         BIOS boot sector, stage2 loader, kernel entry
-arch/x86              GDT/TSS, user mode transition, context switch helpers
-arch/x86/interrupts   IDT, ISR stubs, syscall gate
-include/myos          Public kernel headers
-kernel/core           Kernel entry orchestration
-kernel/drivers        Serial, keyboard, mouse, PIT, ATA, VGA text
-kernel/graphics       Framebuffer surfaces, drawing primitives, blit/fill paths
-kernel/mm             Paging, PMM, heap
-kernel/sched          Scheduler/tasking foundation
-kernel/fs             Disk-backed writable filesystem and initrd fallback
-kernel/input          Normalized GUI input event layer
-kernel/gui/core       GUI event loop, invalidation, compositor state, shared types
-kernel/gui/wm         Window hit testing, drag, resize, and shared window actions
-kernel/gui/desktop    Wallpaper, desktop shortcut, Start menu, taskbar
-kernel/gui/apps       GUI applications such as Terminal
-kernel/shell          Interactive shell
-kernel/lib            Freestanding utility code
+assets/source              Source PNG assets
+assets/manifest.json       Build-time asset crop/scale/format manifest
+tools/build                Image and asset build tools
+tools/test                 QEMU smoke, shell, and screenshot tests
+tools/dev                  Developer helper tools
+arch/x86/boot              BIOS boot sector, stage2 loader, kernel entry
+arch/x86                   GDT/TSS, user mode transition, context switch helpers
+arch/x86/interrupts        IDT, ISR stubs, syscall gate
+include/myos               Public kernel headers
+kernel/assets              Runtime asset loader and bitmap compositing
+kernel/core                Kernel entry orchestration
+kernel/drivers/input       Keyboard and PS/2 mouse drivers
+kernel/drivers/platform    Serial, PIT, CMOS RTC, and PCI enumeration
+kernel/drivers/storage     ATA PIO storage driver
+kernel/drivers/video       VGA text fallback
+kernel/graphics            Framebuffer surfaces, drawing primitives, blit/fill paths
+kernel/mm                  Paging, PMM, heap
+kernel/sched               Scheduler/tasking foundation
+kernel/fs                  Initrd fallback
+kernel/fs/diskfs           Diskfs v2 format, cache, journal marker, fsck, ops
+kernel/input               Normalized GUI input event layer
+kernel/gui/core            GUI event loop, invalidation, compositor state, shared types
+kernel/gui/wm              Window hit testing, drag, resize, and shared window actions
+kernel/gui/desktop         Desktop shortcuts, Start menu, taskbar, asset wallpaper
+kernel/gui/apps            GUI applications such as Terminal
+kernel/shell               Interactive shell
+kernel/lib                 Freestanding utility code
 ```
 
 ## Debug
@@ -210,7 +229,13 @@ ticks
 uptime
 ls
 run /bin/hello.elf
-cat /etc/motd.txt
+cat /etc/motd
+write note.txt hello
+rename note.txt renamed.txt
+truncate renamed.txt 4
+delete renamed.txt
+fsck
+pci
 mem
 tasks
 procs

@@ -9,6 +9,7 @@ enum gui_event_type {
     GUI_EVENT_KEY,
     GUI_EVENT_MOUSE_MOVE,
     GUI_EVENT_MOUSE_BUTTON,
+    GUI_EVENT_MOUSE_SCROLL,
     GUI_EVENT_TIMER_TICK,
 };
 
@@ -31,7 +32,10 @@ struct gui_event {
     int32_t y;
     int32_t dx;
     int32_t dy;
+    int32_t wheel_delta;
     char key;
+    uint16_t keycode;
+    uint8_t modifiers;
     bool pressed;
     uint32_t ticks;
 };

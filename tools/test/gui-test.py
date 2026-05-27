@@ -152,7 +152,7 @@ def main():
         required = [
             "MyOS GUI: desktop initialized with no open apps.",
             "MyOS GUI: Terminal opened.",
-            "Commands: help clear about ticks uptime ls cat run procs tasks mem",
+            "Commands: help clear about ticks uptime ls cat write delete rename truncate fsck pci run procs tasks mem",
             "Window manager: drag focus min max resize.",
             "MyOS GUI: Notepad opened file.",
             "MyOS GUI: Notepad saved file.",
