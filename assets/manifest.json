@@ -15,11 +15,11 @@
       "width": 235,
       "height": 310
     },
-    "width": 24,
-    "height": 34,
+    "width": 6,
+    "height": 8,
     "format": "argb32",
-    "hotspot_x": 2,
-    "hotspot_y": 2
+    "hotspot_x": 1,
+    "hotspot_y": 1
   },
   "cursor_text": {
     "source": "assets/source/cursor_atlas.png",

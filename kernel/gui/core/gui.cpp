@@ -78,6 +78,8 @@ private:
     void toggle_maximize_app(AppId app);
     bool open_file_in_notepad(uint32_t file_index);
     bool open_first_text_file_in_notepad();
+    bool launch_gui_program_if_supported(const char *path);
+    bool run_file_from_explorer(uint32_t file_index);
     void maybe_open_file_from_explorer(int32_t x, int32_t y);
     bool click_matches_press(int32_t x, int32_t y) const;
     void handle_left_press(int32_t x, int32_t y);
@@ -177,12 +179,12 @@ void GuiSystem::update_cursor_animation()
     int32_t abs_dx = dx < 0 ? -dx : dx;
     int32_t abs_dy = dy < 0 ? -dy : dy;
     int32_t max_delta = max_i32(abs_dx, abs_dy);
-    int32_t step = max_delta / 3;
-    if (step < 1) {
-        step = 1;
+    int32_t step = max_delta / 2;
+    if (step < 2) {
+        step = 2;
     }
-    if (step > 10) {
-        step = 10;
+    if (step > 28) {
+        step = 28;
     }
     if (abs_dx <= step) {
         cursor_draw_x_ = target_x;
@@ -480,12 +482,67 @@ static bool file_name_looks_text(const char *name)
            name[len - 2] == 't' && name[len - 1] == 'd';
 }
 
+static bool file_name_has_suffix(const char *name, const char *suffix)
+{
+    uint32_t name_len = 0;
+    uint32_t suffix_len = 0;
+    while (name[name_len] != '\0') {
+        name_len++;
+    }
+    while (suffix[suffix_len] != '\0') {
+        suffix_len++;
+    }
+    if (suffix_len > name_len) {
+        return false;
+    }
+    uint32_t start = name_len - suffix_len;
+    for (uint32_t i = 0; i < suffix_len; i++) {
+        if (name[start + i] != suffix[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool file_name_looks_executable(const char *name)
+{
+    return file_name_has_suffix(name, ".elf") || file_name_has_suffix(name, ".mx");
+}
+
 bool GuiSystem::open_first_text_file_in_notepad()
 {
     for (uint32_t i = 0; i < diskfs_file_count(); i++) {
         if (file_name_looks_text(diskfs_file_name(i))) {
             return open_file_in_notepad(i);
         }
+    }
+    return false;
+}
+
+bool GuiSystem::launch_gui_program_if_supported(const char *path)
+{
+    (void) path;
+    return false;
+}
+
+bool GuiSystem::run_file_from_explorer(uint32_t file_index)
+{
+    if (file_index >= diskfs_file_count()) {
+        return false;
+    }
+    const char *path = diskfs_file_name(file_index);
+    if (file_name_looks_text(path)) {
+        return open_file_in_notepad(file_index);
+    }
+    if (file_name_looks_executable(path)) {
+        if (launch_gui_program_if_supported(path)) {
+            return true;
+        }
+        terminal_.open_window(metrics_, ++z_counter_);
+        focus_app(AppId::Terminal);
+        terminal_.run_program(path, metrics_, ++z_counter_);
+        mark_dirty();
+        return true;
     }
     return false;
 }
@@ -499,7 +556,7 @@ void GuiSystem::maybe_open_file_from_explorer(int32_t x, int32_t y)
     uint32_t now = timer_ticks();
     bool close_in_time = now - last_files_click_tick_ <= DOUBLE_CLICK_TICKS;
     if (close_in_time && last_files_click_index_ == index) {
-        (void) open_file_in_notepad((uint32_t) index);
+        (void) run_file_from_explorer((uint32_t) index);
         last_files_click_index_ = -1;
         last_files_click_tick_ = 0;
     } else {

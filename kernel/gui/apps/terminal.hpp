@@ -25,6 +25,7 @@ public:
     void close();
     void focus(uint32_t z);
     void scroll(int32_t delta);
+    void run_program(const char *path, const Metrics &metrics, uint32_t z);
     void handle_key(char key, const Metrics &metrics, uint32_t z);
     bool hit(int32_t x, int32_t y) const;
 

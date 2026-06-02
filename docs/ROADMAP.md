@@ -93,8 +93,8 @@ and exception diagnostics.
   - Diskfs packages `/assets/wallpaper.myimg` and
     `/assets/cursor_pointer.myimg`; the desktop renders those assets instead of
     the old hard-coded gradient wallpaper and bitmask cursor.
-  - Cursor assets now include a smaller pointer and a text-entry `|` cursor
-    variant generated from the atlas.
+  - Cursor assets now include a 6x8 pointer and a text-entry `|` cursor variant
+    generated from the atlas.
   - Source folders are grouped by responsibility: build/test/dev tools live
     under `tools/`, drivers under `kernel/drivers/{input,platform,storage,video}`,
     assets under `kernel/assets`, and diskfs under `kernel/fs/diskfs`.
@@ -115,10 +115,17 @@ and exception diagnostics.
   - PCI config-space scanning records devices and exposes a `pci` shell command.
 - Cursor and power UX:
   - GUI cursor drawing now animates toward the real mouse target in small steps,
-    reducing visible pointer jumps from large PS/2 deltas.
+    reducing visible pointer jumps from large PS/2 deltas while keeping pointer
+    response fast.
   - Typing printable text temporarily switches the pointer to the text cursor.
   - Start Menu includes Shutdown and Restart actions wired to platform power
     routines.
+- File Explorer polish:
+  - File Explorer now labels TXT, ELF, MX, MYIMG, and generic files with matching
+    type icons instead of showing every row as TXT.
+  - Double-clicking ELF/MX files dispatches through a launcher hook; current
+    terminal programs open Terminal and run from diskfs, while future GUI app
+    binaries can be routed to GUI windows without changing File Explorer.
 
 ## Recommended Next Updates
 
@@ -138,14 +145,14 @@ and exception diagnostics.
    - Current state: Terminal, File Explorer, Notepad, System Monitor, and About
      are implemented as separate GUI app modules with Start menu, function-key,
      and desktop shortcut launch paths.
-   - File Explorer now lists diskfs entries with text-file icons and double-click
-     opens text files in Notepad.
+   - File Explorer now lists diskfs entries with type-specific icons and double-click
+     opens text files in Notepad or launches ELF/MX programs.
    - Notepad can view/edit diskfs text files, supports Backspace while typing,
      and persists edits with `Ctrl+S`.
    - Next app polish: cursor navigation, text selection, vertical scrolling, and
      status/error surfacing in Notepad.
-   - Next utility apps: process/task tables and refresh controls in System
-     Monitor; settings controls for theme, terminal font scale, and input
+   - Next utility apps: richer process/task tables and refresh controls in
+     System Monitor; settings controls for theme, terminal font scale, and input
      diagnostics.
 
 3. Terminal UX
@@ -158,8 +165,8 @@ and exception diagnostics.
      IntelliMouse wheel packets, CMOS time, and PCI enumeration are implemented.
    - Next platform work: identify PCI IDE/class drivers, add controller-specific
      driver binding, and surface PCI device names in GUI diagnostics.
-   - Next input work: add Alt-Tab, text selection shortcuts, cursor-shape hit
-     testing by window region, and full scancode set coverage for extended keys.
+   - Next input work: add Alt-Tab, text selection shortcuts, region-specific
+     cursor shape selection, and full scancode set coverage for extended keys.
 
 5. Filesystem and reliability
    - Current state: diskfs v2 has directory-aware paths, inodes, bitmap

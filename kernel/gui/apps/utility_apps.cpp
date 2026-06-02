@@ -149,6 +149,45 @@ static void draw_u32(graphics_surface *surface, int32_t x, int32_t y, const char
     graphics_draw_string(surface, x + 108, y, text, COLOR_ACCENT_DARK, 0x00FFFFFF);
 }
 
+static bool has_suffix(const char *name, const char *suffix)
+{
+    uint32_t name_len = 0;
+    uint32_t suffix_len = 0;
+    while (name[name_len] != '\0') {
+        name_len++;
+    }
+    while (suffix[suffix_len] != '\0') {
+        suffix_len++;
+    }
+    if (suffix_len > name_len) {
+        return false;
+    }
+    uint32_t start = name_len - suffix_len;
+    for (uint32_t i = 0; i < suffix_len; i++) {
+        if (name[start + i] != suffix[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static const char *file_icon_label(const char *name)
+{
+    if (has_suffix(name, ".elf")) {
+        return "ELF";
+    }
+    if (has_suffix(name, ".mx")) {
+        return "MX";
+    }
+    if (has_suffix(name, ".myimg")) {
+        return "MYIMG";
+    }
+    if (has_suffix(name, ".txt") || has_suffix(name, "/motd")) {
+        return "TXT";
+    }
+    return "FILE";
+}
+
 void UtilityApp::draw_files(graphics_surface *surface) const
 {
     int32_t x = window_.x + 14;
@@ -157,9 +196,10 @@ void UtilityApp::draw_files(graphics_surface *surface) const
     y += 14;
     size_t count = diskfs_file_count();
     for (size_t i = 0; i < count && y < window_.y + window_.h - 12; i++) {
+        const char *name = diskfs_file_name(i);
         graphics_fill_rect(surface, x - 4, y - 2, window_.w - 28, 11, (i % 2) == 0 ? 0x00EEF3F8 : 0x00FFFFFF);
-        graphics_draw_string(surface, x, y, "TXT", COLOR_ACCENT_DARK, (i % 2) == 0 ? 0x00EEF3F8 : 0x00FFFFFF);
-        graphics_draw_string(surface, x + 24, y, diskfs_file_name(i), COLOR_TEXT_DARK, (i % 2) == 0 ? 0x00EEF3F8 : 0x00FFFFFF);
+        graphics_draw_string(surface, x, y, file_icon_label(name), COLOR_ACCENT_DARK, (i % 2) == 0 ? 0x00EEF3F8 : 0x00FFFFFF);
+        graphics_draw_string(surface, x + 38, y, name, COLOR_TEXT_DARK, (i % 2) == 0 ? 0x00EEF3F8 : 0x00FFFFFF);
         y += 12;
     }
 }

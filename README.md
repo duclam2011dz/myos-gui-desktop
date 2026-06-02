@@ -48,6 +48,8 @@ Current kernel features:
 - Build-time PNG asset pipeline that converts `assets/source/wallpaper.png` and
   `assets/source/cursor_atlas.png` into compact diskfs runtime assets.
 - Smaller pointer cursor plus a text-entry `|` cursor variant while typing.
+- File Explorer shows TXT/ELF/MX/MYIMG file labels and can run diskfs ELF/MX
+  programs through Terminal on double-click.
 - Graphics foundation with bootloader framebuffer handoff, high-memory
   framebuffer paging, framebuffer surface abstraction, drawing primitives, and
   bitmap-style font rendering.

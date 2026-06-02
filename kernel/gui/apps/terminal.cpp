@@ -271,6 +271,17 @@ void TerminalApp::scroll(int32_t delta)
     }
 }
 
+void TerminalApp::run_program(const char *path, const Metrics &metrics, uint32_t z)
+{
+    open_window(metrics, z);
+    print("Loading user program: ");
+    print(path);
+    print("\n");
+    int code = usermode_run_program(path);
+    print_u32("Program exited with code ", (uint32_t) code);
+    print("myos> ");
+}
+
 bool TerminalApp::hit(int32_t x, int32_t y) const
 {
     return window_.visible() && window_.rect().contains(x, y);
@@ -477,12 +488,7 @@ void TerminalApp::execute_command(const char *line)
         return;
     }
     if (line[0] == 'r' && line[1] == 'u' && line[2] == 'n' && line[3] == ' ') {
-        print("Loading user program: ");
-        print(line + 4);
-        print("\n");
-        int code = usermode_run_program(line + 4);
-        print_u32("Program exited with code ", (uint32_t) code);
-        print("myos> ");
+        run_program(line + 4, Metrics{0, 0, 0}, window_.z);
         return;
     }
 
