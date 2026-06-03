@@ -8,8 +8,8 @@ Current kernel features:
 - 32-bit protected mode.
 - VBE linear framebuffer graphics with VGA mode 13h fallback.
 - Double-buffered Windows-like desktop GUI with PNG-derived wallpaper and cursor
-  assets, taskbar, Start button, CMOS-backed clock/date, app indicator, Terminal
-  shortcut, Shutdown/Restart actions, and window controls.
+  assets, taskbar, Start button, CMOS-backed clock/date, app indicator, ELF-backed
+  app shortcuts, Shutdown/Restart actions, and window controls.
 - COM1 serial logging.
 - IDT with CPU exception and IRQ stubs.
 - PIC remap with IRQ1 keyboard support.
@@ -36,26 +36,34 @@ Current kernel features:
   journal marker, and fsck validation.
 - Dynamic paging APIs: `paging_map_page`, `paging_unmap_page`, `paging_get_physical`.
 - Heap hardening: aligned allocations, double-free accounting, whole-region PMM release.
+- Separate freestanding runtimes: `lib/libk` for kernel C/C++ utility/runtime
+  support and `user/libc` for Ring 3 C/C++ ELF applications.
 - Ring 3 user mode with GDT/TSS, `int 0x80` syscall gate, and shell `usertest`.
 - Disk-backed user program loading through shell `run hello.mx`.
-- Minimal ELF32 user program loading through shell `run hello.elf`.
+- Build-linked ELF32 user programs under `user/apps`, packaged into diskfs
+  under `/apps`, `/bin/hello.elf`, and `/hello.elf`.
 - ELF32 loading from slash paths such as `run /bin/hello.elf`.
 - User process table with PID, process state, exit code, and per-process file descriptors.
-- User syscall layer with `write`, `exit`, `yield`, `uptime`, `open`, `read`, `close`, `getpid`, `waitpid`, and `writefile`.
+- User syscall layer with `write`, `exit`, `yield`, `uptime`, `open`, `read`,
+  `close`, `getpid`, `waitpid`, `writefile`, and GUI app-open requests.
 - Directory-aware diskfs reads/writes with offset-based file access for user descriptors.
 - Diskfs truncate/delete/rename/fsck commands and APIs.
 - Process lifecycle shell commands: `spawn`, `wait`, and `reap`.
 - Build-time PNG asset pipeline that converts `assets/source/wallpaper.png` and
   `assets/source/cursor_atlas.png` into compact diskfs runtime assets.
 - Smaller pointer cursor plus a text-entry `|` cursor variant while typing.
-- File Explorer shows TXT/ELF/MX/MYIMG file labels and can run diskfs ELF/MX
-  programs through Terminal on double-click.
+- File Explorer shows TXT/ELF/MX/MYIMG file labels. Double-clicking GUI app
+  ELFs such as `/apps/notepad.elf` opens their window directly; terminal-style
+  ELFs such as `/apps/hello.elf` open Terminal and run there.
 - Graphics foundation with bootloader framebuffer handoff, high-memory
   framebuffer paging, framebuffer surface abstraction, drawing primitives, and
   bitmap-style font rendering.
 - GUI dirty-region tracking with coalesced input processing and faster fill/blit
   framebuffer primitives.
-- Modular C++ GUI apps: Terminal, File Explorer, Notepad, System Monitor, and About.
+- Terminal, File Explorer, Notepad, System Monitor, and About are exposed as
+  Ring 3 ELF launchers in diskfs and from desktop/Start shortcuts. Their current
+  framebuffer window backing is still served by the kernel compositor through a
+  GUI syscall until full userland GUI IPC exists.
 - File Explorer can open text files in Notepad; Notepad edits in-memory text and
   persists changes to diskfs with `Ctrl+S`.
 
@@ -188,9 +196,13 @@ kernel/input               Normalized GUI input event layer
 kernel/gui/core            GUI event loop, invalidation, compositor state, shared types
 kernel/gui/wm              Window hit testing, drag, resize, and shared window actions
 kernel/gui/desktop         Desktop shortcuts, Start menu, taskbar, asset wallpaper
-kernel/gui/apps            GUI applications such as Terminal
+kernel/gui/apps            Kernel compositor backing for current GUI windows
 kernel/shell               Interactive shell
-kernel/lib                 Freestanding utility code
+lib/libk                   Kernel C/C++ freestanding runtime helpers
+user/include               Userland libc headers
+user/libc                  Ring 3 C/C++ freestanding libc/runtime
+user/apps                  Userland ELF app sources and GUI launchers
+user/linker                User ELF linker scripts
 ```
 
 ## Debug
@@ -222,8 +234,9 @@ task, then start the
 ## GUI
 
 Run `make run`. The OS boots straight into the VBE graphics desktop with QEMU's
-host cursor hidden by default. Double-click the Terminal desktop shortcut, or
-click Start and choose Terminal, then type:
+host cursor hidden by default. Double-click a desktop shortcut, click Start, or
+double-click an app ELF in File Explorer; those launch `/apps/*.elf` from diskfs.
+For Terminal, type:
 
 ```text
 help

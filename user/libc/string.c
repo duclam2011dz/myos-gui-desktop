@@ -1,6 +1,6 @@
-#include "util.h"
+#include "libc.h"
 
-size_t kstrlen(const char *value)
+size_t strlen(const char *value)
 {
     size_t length = 0;
     while (value[length] != '\0') {
@@ -9,7 +9,7 @@ size_t kstrlen(const char *value)
     return length;
 }
 
-int kstrcmp(const char *left, const char *right)
+int strcmp(const char *left, const char *right)
 {
     size_t i = 0;
     while (left[i] != '\0' && right[i] != '\0') {
@@ -18,21 +18,26 @@ int kstrcmp(const char *left, const char *right)
         }
         i++;
     }
-
     return (unsigned char) left[i] - (unsigned char) right[i];
 }
 
-void u32_to_hex(uint32_t value, char out[11])
+void *memcpy(void *dst, const void *src, size_t size)
 {
-    static const char digits[] = "0123456789ABCDEF";
-
-    out[0] = '0';
-    out[1] = 'x';
-    for (int i = 0; i < 8; i++) {
-        uint8_t nibble = (uint8_t) ((value >> ((7 - i) * 4)) & 0xF);
-        out[2 + i] = digits[nibble];
+    unsigned char *out = (unsigned char *) dst;
+    const unsigned char *in = (const unsigned char *) src;
+    for (size_t i = 0; i < size; i++) {
+        out[i] = in[i];
     }
-    out[10] = '\0';
+    return dst;
+}
+
+void *memset(void *dst, int value, size_t size)
+{
+    unsigned char *out = (unsigned char *) dst;
+    for (size_t i = 0; i < size; i++) {
+        out[i] = (unsigned char) value;
+    }
+    return dst;
 }
 
 void u32_to_dec(uint32_t value, char *out, size_t out_size)

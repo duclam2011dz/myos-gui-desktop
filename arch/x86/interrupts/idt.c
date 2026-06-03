@@ -232,7 +232,7 @@ struct interrupt_frame *interrupt_dispatch(struct interrupt_frame *frame)
 {
     if (frame->int_no == 128) {
         syscall_handle(frame);
-        return scheduler_schedule_from_interrupt(frame);
+        return frame;
     }
 
     if (frame->int_no == 33) {

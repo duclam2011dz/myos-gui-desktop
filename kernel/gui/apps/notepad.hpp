@@ -14,6 +14,7 @@ public:
     static constexpr uint32_t BUFFER_SIZE = 2048;
 
     void initialize(const Metrics &metrics);
+    void open_window(const Metrics &metrics, uint32_t z);
     bool open_file(const char *path, const Metrics &metrics, uint32_t z);
     void close();
     void minimize();

@@ -2,14 +2,15 @@
 
 MyOS currently has a BIOS boot sector plus stage2 loader, E820 memory handoff,
 VBE linear framebuffer graphics with VGA mode 13h fallback, high-memory
-framebuffer paging, a pixel/font renderer, freestanding C++ GUI modules,
+framebuffer paging, a pixel/font renderer, freestanding C++ GUI backing modules,
 double-buffered Windows-like desktop GUI, PS/2 keyboard and mouse input, a
 normalized GUI input event layer, a taskbar with Start button, Shutdown/Restart
-power actions, CMOS-backed clock/date, app indicator, PNG-derived wallpaper and cursor assets, Terminal
-shortcut, File Explorer, Notepad text editor, System
-Monitor, About app, window controls,
+power actions, CMOS-backed clock/date, app indicator, PNG-derived wallpaper and cursor assets,
+ELF-backed desktop shortcuts for Terminal, File Explorer, Notepad text editor,
+System Monitor, and About, window controls,
 32-bit protected mode, kernel-owned GDT/TSS, ring 3 user mode, `int 0x80`
-syscalls, MEXE and ELF32 user programs loaded from diskfs, IDT/IRQ handling,
+syscalls, separate `libk` and user `libc` runtimes, MEXE and ELF32 user programs
+loaded from diskfs, IDT/IRQ handling,
 PIT IRQ0, full IRQ-return preemptive task switching, COM1 logging, 128 MiB
 identity paging, per-process user address spaces with CR3 switching, dynamic
 page map/unmap APIs, E820-backed PMM, hardened PMM-backed heap, ATA PIO
@@ -124,9 +125,25 @@ and exception diagnostics.
 - File Explorer polish:
   - File Explorer now labels TXT, ELF, MX, MYIMG, and generic files with matching
     type icons instead of showing every row as TXT.
-  - Double-clicking ELF/MX files dispatches through a launcher hook; current
-    terminal programs open Terminal and run from diskfs, while future GUI app
-    binaries can be routed to GUI windows without changing File Explorer.
+  - Double-clicking GUI app ELFs under `/apps` opens the requested GUI window
+    directly through the Ring 3 launcher/syscall path.
+  - Double-clicking terminal-style ELF/MX programs opens Terminal and runs the
+    program from diskfs.
+- Userland runtime and ELF launch:
+  - Kernel utility/runtime helpers now live in `lib/libk` for shared C/C++
+    kernel code.
+  - Ring 3 ELF apps now link against `user/libc`, a freestanding C/C++ runtime
+    with syscall wrappers, string/memory helpers, `crt0`, and minimal C++ ABI
+    stubs.
+  - The build links `/apps/terminal.elf`, `/apps/notepad.elf`,
+    `/apps/file-explorer.elf`, `/apps/system-monitor.elf`, `/apps/about.elf`,
+    and `/apps/hello.elf`, then packages them into diskfs.
+  - Desktop shortcuts, Start menu GUI app entries, and File Explorer GUI ELF
+    double-clicks route through those Ring 3 ELF launchers.
+  - `usermode_enter` now preserves callee-saved kernel registers across Ring 3
+    execution, fixing the kernel panic that occurred after ELF `exit`.
+  - `int 0x80` returns no longer run the IRQ scheduler directly, avoiding
+    syscall-stack task switches until per-process kernel stacks exist.
 
 ## Recommended Next Updates
 
@@ -134,7 +151,7 @@ and exception diagnostics.
    - Current state: generalized hit testing, z-order focus, drag, resize,
      minimize, maximize, restore, close, task buttons, Start menu launch, and
      desktop shortcut launch are implemented across Terminal, File Explorer,
-     System Monitor, About, and Notepad.
+     System Monitor, About, and Notepad through `/apps/*.elf` launchers.
    - Next refactor: replace the fixed app fields in `GuiSystem` with a compact
      reusable window registry and per-window paint/input callbacks.
    - Next widgets: extract titlebar buttons, menu rows, task buttons, scrollbars,
@@ -144,12 +161,15 @@ and exception diagnostics.
 
 2. GUI applications
    - Current state: Terminal, File Explorer, Notepad, System Monitor, and About
-     are implemented as separate GUI app modules with Start menu, function-key,
-     and desktop shortcut launch paths.
+     launch through Ring 3 ELF stubs in `/apps`; their window state, painting,
+     and input handling are still served by the kernel compositor backing.
    - File Explorer now lists diskfs entries with type-specific icons and double-click
      opens text files in Notepad or launches ELF/MX programs.
    - Notepad can view/edit diskfs text files, supports Backspace while typing,
      and persists edits with `Ctrl+S`.
+   - Next architecture step: add real GUI IPC for user processes to create
+     windows, receive events, paint buffers, and persist app state without
+     keeping app-specific window logic in Ring 0.
    - Next app polish: cursor navigation, text selection, vertical scrolling, and
      status/error surfacing in Notepad.
    - Next utility apps: richer process/task tables and refresh controls in
@@ -184,7 +204,7 @@ and exception diagnostics.
 
 ## Suggested Immediate Milestone
 
-Next time, generalize the C++ window manager and widget model. The OS now has
-asset-backed visuals, direct cursor overlay updates, power actions, dirty-region
-tracking, and C++ GUI modules; the next bottleneck is replacing single-app
-assumptions with reusable window/widget abstractions.
+Next time, build the userland GUI IPC layer. The OS now has ELF app launchers,
+separate kernel/user runtimes, diskfs-packaged `/apps/*.elf`, and stable Ring 3
+exit handling; the next bottleneck is moving paint/input state out of
+app-specific Ring 0 backing classes and into user processes.

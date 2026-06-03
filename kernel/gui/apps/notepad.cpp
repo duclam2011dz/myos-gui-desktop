@@ -87,6 +87,27 @@ bool NotepadApp::open_file(const char *path, const Metrics &metrics, uint32_t z)
     return true;
 }
 
+void NotepadApp::open_window(const Metrics &metrics, uint32_t z)
+{
+    if (!window_.open) {
+        default_geometry(metrics);
+        window_.restore_x = window_.x;
+        window_.restore_y = window_.y;
+        window_.restore_w = window_.w;
+        window_.restore_h = window_.h;
+        set_path("untitled.txt");
+        buffer_[0] = '\0';
+        length_ = 0;
+        cursor_ = 0;
+        dirty_ = false;
+        last_save_ok_ = false;
+    }
+    window_.open = true;
+    window_.mode = WindowMode::Normal;
+    focus(z);
+    serial_writestring("MyOS GUI: Notepad opened.\n");
+}
+
 void NotepadApp::close()
 {
     window_.open = false;

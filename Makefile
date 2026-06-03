@@ -27,6 +27,17 @@ FS_IMG := $(BUILD_DIR)/fs.img
 OS_IMAGE := $(BUILD_DIR)/myos.img
 ASSET_MANIFEST := assets/manifest.json
 ASSET_FILES := $(BUILD_DIR)/assets/wallpaper.myimg $(BUILD_DIR)/assets/cursor_pointer.myimg $(BUILD_DIR)/assets/cursor_text.myimg
+USER_LINKER := user/linker/user.ld
+USER_LIBC_C := user/libc/crt0.c user/libc/syscall.c user/libc/string.c
+USER_LIBC_CPP := user/libc/cxx.cpp
+USER_LIBC_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(USER_LIBC_C)) \
+	$(patsubst %.cpp,$(BUILD_DIR)/%.o,$(USER_LIBC_CPP))
+USER_APPS := $(BUILD_DIR)/user/apps/hello.elf \
+	$(BUILD_DIR)/user/apps/terminal.elf \
+	$(BUILD_DIR)/user/apps/notepad.elf \
+	$(BUILD_DIR)/user/apps/file-explorer.elf \
+	$(BUILD_DIR)/user/apps/system-monitor.elf \
+	$(BUILD_DIR)/user/apps/about.elf
 
 CFLAGS := -std=gnu11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector \
 	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
@@ -36,6 +47,14 @@ CXXFLAGS := -std=gnu++17 -ffreestanding -fno-exceptions -fno-rtti -fno-threadsaf
 	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
 	-Wall -Wextra -Iinclude/myos -DFS_START_LBA=$(FS_START_LBA) -g
 LDFLAGS := -nostdlib -T linker.ld
+USER_CFLAGS := -std=gnu11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector \
+	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
+	-Wall -Wextra -Iuser/include -Iinclude/myos -g
+USER_CXXFLAGS := -std=gnu++17 -ffreestanding -fno-exceptions -fno-rtti -fno-threadsafe-statics \
+	-fno-use-cxa-atexit -fno-pie -fno-pic -fno-stack-protector $(CXX_TARGET_FLAGS) \
+	-nostdinc -isystem $(CROSS_GCC_INCLUDE) \
+	-Wall -Wextra -Iuser/include -Iinclude/myos -g
+USER_LDFLAGS := -nostdlib -T $(USER_LINKER)
 
 KERNEL_ASM := arch/x86/boot/entry.asm arch/x86/interrupts/isr.asm arch/x86/switch.asm arch/x86/gdt_flush.asm arch/x86/usermode.asm
 KERNEL_C := kernel/core/kernel.c kernel/core/syscall.c kernel/core/usermode.c arch/x86/gdt.c arch/x86/interrupts/idt.c \
@@ -43,9 +62,9 @@ KERNEL_C := kernel/core/kernel.c kernel/core/syscall.c kernel/core/usermode.c ar
 	kernel/drivers/platform/timer.c kernel/drivers/platform/rtc.c kernel/drivers/platform/pci.c kernel/drivers/platform/power.c kernel/drivers/storage/ata.c \
 	kernel/mm/paging.c kernel/mm/pmm.c kernel/mm/heap.c \
 	kernel/sched/scheduler.c kernel/fs/initrd.c kernel/fs/diskfs/diskfs.c \
-	kernel/input/input.c kernel/assets/assets.c kernel/shell/shell.c kernel/lib/util.c
+	kernel/input/input.c kernel/assets/assets.c kernel/shell/shell.c lib/libk/runtime.c
 KERNEL_CPP := kernel/gui/core/gui.cpp kernel/gui/wm/window_manager.cpp kernel/gui/desktop/desktop.cpp \
-	kernel/gui/apps/terminal.cpp kernel/gui/apps/utility_apps.cpp kernel/gui/apps/notepad.cpp
+	kernel/gui/apps/terminal.cpp kernel/gui/apps/utility_apps.cpp kernel/gui/apps/notepad.cpp lib/libk/cxx.cpp
 KERNEL_OBJS := $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM)) \
 	$(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C)) \
 	$(patsubst %.cpp,$(BUILD_DIR)/%.o,$(KERNEL_CPP))
@@ -69,6 +88,14 @@ $(BUILD_DIR)/%.o: %.asm | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(AS) -f elf32 $< -o $@
 
+$(BUILD_DIR)/user/%.o: user/%.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/user/%.o: user/%.cpp | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(USER_CXXFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -85,11 +112,49 @@ $(KERNEL_BIN): $(KERNEL_ELF)
 	@test $$(stat -c%s $@) -le $$(($(KERNEL_SECTORS) * 512)) || \
 		(echo "Kernel is larger than the $(KERNEL_SECTORS) sectors loaded by stage2"; exit 1)
 
+$(BUILD_DIR)/user/apps/hello.elf: $(BUILD_DIR)/user/apps/hello.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/hello.o -o $@
+
+$(BUILD_DIR)/user/apps/terminal_launcher.o: user/apps/gui_launcher.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -DMYOS_GUI_LAUNCHER_APP=MYOS_GUI_APP_TERMINAL -c $< -o $@
+
+$(BUILD_DIR)/user/apps/notepad_launcher.o: user/apps/gui_launcher.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -DMYOS_GUI_LAUNCHER_APP=MYOS_GUI_APP_NOTEPAD -c $< -o $@
+
+$(BUILD_DIR)/user/apps/file_explorer_launcher.o: user/apps/gui_launcher.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -DMYOS_GUI_LAUNCHER_APP=MYOS_GUI_APP_FILES -c $< -o $@
+
+$(BUILD_DIR)/user/apps/system_monitor_launcher.o: user/apps/gui_launcher.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -DMYOS_GUI_LAUNCHER_APP=MYOS_GUI_APP_MONITOR -c $< -o $@
+
+$(BUILD_DIR)/user/apps/about_launcher.o: user/apps/gui_launcher.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(USER_CFLAGS) -DMYOS_GUI_LAUNCHER_APP=MYOS_GUI_APP_ABOUT -c $< -o $@
+
+$(BUILD_DIR)/user/apps/terminal.elf: $(BUILD_DIR)/user/apps/terminal_launcher.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/terminal_launcher.o -o $@
+
+$(BUILD_DIR)/user/apps/notepad.elf: $(BUILD_DIR)/user/apps/notepad_launcher.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/notepad_launcher.o -o $@
+
+$(BUILD_DIR)/user/apps/file-explorer.elf: $(BUILD_DIR)/user/apps/file_explorer_launcher.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/file_explorer_launcher.o -o $@
+
+$(BUILD_DIR)/user/apps/system-monitor.elf: $(BUILD_DIR)/user/apps/system_monitor_launcher.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/system_monitor_launcher.o -o $@
+
+$(BUILD_DIR)/user/apps/about.elf: $(BUILD_DIR)/user/apps/about_launcher.o $(USER_LIBC_OBJS) $(USER_LINKER)
+	$(LD) $(USER_LDFLAGS) $(USER_LIBC_OBJS) $(BUILD_DIR)/user/apps/about_launcher.o -o $@
+
 $(ASSET_FILES): tools/build/png_asset_pack.py $(ASSET_MANIFEST) assets/source/wallpaper.png assets/source/cursor_atlas.png | $(BUILD_DIR)
 	python3 tools/build/png_asset_pack.py $(ASSET_MANIFEST)
 
-$(FS_IMG): tools/build/mkfs.py $(ASSET_FILES) | $(BUILD_DIR)
-	python3 tools/build/mkfs.py $@
+$(FS_IMG): tools/build/mkfs.py $(ASSET_FILES) $(USER_APPS) | $(BUILD_DIR)
+	python3 tools/build/mkfs.py $@ $(USER_APPS)
 
 $(OS_IMAGE): $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_BIN) $(FS_IMG)
 	dd if=/dev/zero of=$@ bs=512 count=$$(($(KERNEL_SECTORS) + $(STAGE2_SECTORS) + $(FS_SECTORS) + 1)) status=none
@@ -148,7 +213,7 @@ format-check:
 		clang-format --dry-run --Werror $(KERNEL_C) $(KERNEL_CPP) \
 			kernel/gui/core/gui_types.hpp kernel/gui/wm/window_manager.hpp kernel/gui/desktop/desktop.hpp \
 			kernel/gui/apps/terminal.hpp kernel/gui/apps/utility_apps.hpp kernel/gui/apps/notepad.hpp \
-			include/myos/*.h; \
+			include/myos/*.h user/include/*.h user/libc/*.c user/apps/*.c lib/libk/*.c lib/libk/*.cpp; \
 	else \
 		echo "clang-format: missing, skipping optional format check"; \
 	fi

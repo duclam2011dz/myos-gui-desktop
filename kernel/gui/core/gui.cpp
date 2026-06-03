@@ -17,7 +17,9 @@ extern "C" {
 #include "mouse.h"
 #include "power.h"
 #include "serial.h"
+#include "syscall_numbers.h"
 #include "timer.h"
+#include "usermode.h"
 }
 
 namespace myos::gui {
@@ -31,6 +33,7 @@ public:
     void initialize();
     void run();
     void terminal_write(const char *text);
+    int open_user_app(uint32_t app_id);
 
 private:
     Metrics metrics_ = {FALLBACK_W, FALLBACK_H, 18};
@@ -79,6 +82,7 @@ private:
     NotepadApp *notepad_for_app(AppId app);
     void focus_app(AppId app);
     void open_app(AppId app);
+    bool launch_app_elf(AppId app);
     void minimize_app(AppId app);
     void close_app(AppId app);
     void toggle_maximize_app(AppId app);
@@ -441,6 +445,8 @@ void GuiSystem::open_app(AppId app)
 {
     if (app == AppId::Terminal) {
         terminal_.open_window(metrics_, ++z_counter_);
+    } else if (app == AppId::Notepad) {
+        notepad_.open_window(metrics_, ++z_counter_);
     } else {
         UtilityApp *utility = utility_for_app(app);
         if (utility != nullptr) {
@@ -450,6 +456,53 @@ void GuiSystem::open_app(AppId app)
     focus_app(app);
     start_menu_open_ = false;
     mark_dirty();
+}
+
+int GuiSystem::open_user_app(uint32_t app_id)
+{
+    if (app_id == MYOS_GUI_APP_TERMINAL) {
+        open_app(AppId::Terminal);
+        return 0;
+    }
+    if (app_id == MYOS_GUI_APP_FILES) {
+        open_app(AppId::Files);
+        return 0;
+    }
+    if (app_id == MYOS_GUI_APP_MONITOR) {
+        open_app(AppId::Monitor);
+        return 0;
+    }
+    if (app_id == MYOS_GUI_APP_ABOUT) {
+        open_app(AppId::About);
+        return 0;
+    }
+    if (app_id == MYOS_GUI_APP_NOTEPAD) {
+        open_app(AppId::Notepad);
+        return 0;
+    }
+    return -1;
+}
+
+bool GuiSystem::launch_app_elf(AppId app)
+{
+    const char *path = nullptr;
+    if (app == AppId::Terminal) {
+        path = "/apps/terminal.elf";
+    } else if (app == AppId::Files) {
+        path = "/apps/file-explorer.elf";
+    } else if (app == AppId::Monitor) {
+        path = "/apps/system-monitor.elf";
+    } else if (app == AppId::About) {
+        path = "/apps/about.elf";
+    } else if (app == AppId::Notepad) {
+        path = "/apps/notepad.elf";
+    }
+
+    if (path == nullptr) {
+        return false;
+    }
+
+    return usermode_run_program(path) == 0;
 }
 
 void GuiSystem::minimize_app(AppId app)
@@ -570,7 +623,13 @@ bool GuiSystem::open_first_text_file_in_notepad()
 
 bool GuiSystem::launch_gui_program_if_supported(const char *path)
 {
-    (void) path;
+    if (file_name_has_suffix(path, "/terminal.elf") ||
+        file_name_has_suffix(path, "/notepad.elf") ||
+        file_name_has_suffix(path, "/file-explorer.elf") ||
+        file_name_has_suffix(path, "/system-monitor.elf") ||
+        file_name_has_suffix(path, "/about.elf")) {
+        return usermode_run_program(path) == 0;
+    }
     return false;
 }
 
@@ -676,7 +735,12 @@ void GuiSystem::handle_left_release(int32_t x, int32_t y)
         return;
     }
     if (release_hit.target == HitTarget::TaskButton || release_hit.target == HitTarget::StartTerminal) {
-        open_app(release_hit.app);
+        if (release_hit.target == HitTarget::TaskButton) {
+            open_app(release_hit.app);
+        } else {
+            (void) launch_app_elf(release_hit.app);
+            mark_dirty();
+        }
         return;
     }
     if (release_hit.target == HitTarget::StartShutdown) {
@@ -694,7 +758,7 @@ void GuiSystem::handle_left_release(int32_t x, int32_t y)
                               x >= last_icon_click_x_ - 4 && x <= last_icon_click_x_ + 4 &&
                               y >= last_icon_click_y_ - 4 && y <= last_icon_click_y_ + 4;
         if (close_in_time && close_in_space) {
-            open_app(release_hit.app);
+            (void) launch_app_elf(release_hit.app);
             last_icon_click_tick_ = 0;
             last_icon_click_x_ = -1000;
             last_icon_click_y_ = -1000;
@@ -702,7 +766,7 @@ void GuiSystem::handle_left_release(int32_t x, int32_t y)
             last_icon_click_tick_ = now;
             last_icon_click_x_ = x;
             last_icon_click_y_ = y;
-            serial_writestring("MyOS GUI: Terminal shortcut selected.\n");
+            serial_writestring("MyOS GUI: desktop shortcut selected.\n");
         }
         mark_dirty();
         return;
@@ -748,23 +812,27 @@ void GuiSystem::handle_event(const gui_event &event)
             cursor_text_until_tick_ = timer_ticks() + 80;
         }
         if (event.key == GUI_KEY_F1) {
-            open_app(AppId::Terminal);
+            (void) launch_app_elf(AppId::Terminal);
+            mark_dirty();
             return;
         }
         if (event.key == GUI_KEY_F2) {
-            open_app(AppId::Files);
+            (void) launch_app_elf(AppId::Files);
+            mark_dirty();
             return;
         }
         if (event.key == GUI_KEY_F3) {
-            open_app(AppId::Monitor);
+            (void) launch_app_elf(AppId::Monitor);
+            mark_dirty();
             return;
         }
         if (event.key == GUI_KEY_F4) {
-            open_app(AppId::About);
+            (void) launch_app_elf(AppId::About);
+            mark_dirty();
             return;
         }
         if (event.key == GUI_KEY_F5) {
-            open_app(AppId::Files);
+            (void) launch_app_elf(AppId::Files);
             (void) open_first_text_file_in_notepad();
             return;
         }
@@ -921,4 +989,9 @@ extern "C" void gui_run(void)
 extern "C" void gui_terminal_write(const char *text)
 {
     myos::gui::g_gui.terminal_write(text);
+}
+
+extern "C" int gui_open_application(uint32_t app_id)
+{
+    return myos::gui::g_gui.open_user_app(app_id);
 }

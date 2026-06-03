@@ -109,7 +109,7 @@ def main():
             "diskfs:",
             "/bin/hello.elf",
             "Loading user program: /bin/hello.elf",
-            "Hello from disk-loaded ring 3 program.",
+            "Hello from disk-loaded Ring 3 ELF via libc.",
             "Program exited with code 7",
         ]
 

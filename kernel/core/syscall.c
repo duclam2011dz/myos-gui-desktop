@@ -1,26 +1,17 @@
 #include "syscall.h"
 
 #include "diskfs.h"
+#include "gui.h"
 #include "paging.h"
 #include "scheduler.h"
 #include "serial.h"
+#include "syscall_numbers.h"
 #include "timer.h"
 #include "usermode.h"
 #include "vga.h"
 
 #include <stdbool.h>
 #include <stdint.h>
-
-#define SYSCALL_WRITE 1
-#define SYSCALL_EXIT 2
-#define SYSCALL_YIELD 3
-#define SYSCALL_UPTIME 4
-#define SYSCALL_OPEN 5
-#define SYSCALL_READ 6
-#define SYSCALL_CLOSE 7
-#define SYSCALL_GETPID 8
-#define SYSCALL_WAITPID 9
-#define SYSCALL_WRITEFILE 10
 
 extern void usermode_return_from_exit(void);
 extern uint32_t usermode_exit_code;
@@ -57,7 +48,7 @@ static void syscall_write(const char *data, uint32_t size)
 
 void syscall_handle(struct interrupt_frame *frame)
 {
-    if (frame->eax == SYSCALL_WRITE) {
+    if (frame->eax == MYOS_SYSCALL_WRITE) {
         if (user_buffer_is_valid(frame->ebx, frame->ecx)) {
             syscall_write((const char *) frame->ebx, frame->ecx);
             frame->eax = frame->ecx;
@@ -67,7 +58,7 @@ void syscall_handle(struct interrupt_frame *frame)
         return;
     }
 
-    if (frame->eax == SYSCALL_EXIT) {
+    if (frame->eax == MYOS_SYSCALL_EXIT) {
         usermode_exit_code = frame->ebx;
         frame->eip = (uint32_t) usermode_return_from_exit;
         frame->cs = 0x08;
@@ -75,19 +66,19 @@ void syscall_handle(struct interrupt_frame *frame)
         return;
     }
 
-    if (frame->eax == SYSCALL_YIELD) {
+    if (frame->eax == MYOS_SYSCALL_YIELD) {
         syscall_yield_count++;
         scheduler_request_reschedule();
         frame->eax = 0;
         return;
     }
 
-    if (frame->eax == SYSCALL_UPTIME) {
+    if (frame->eax == MYOS_SYSCALL_UPTIME) {
         frame->eax = timer_uptime_seconds();
         return;
     }
 
-    if (frame->eax == SYSCALL_OPEN) {
+    if (frame->eax == MYOS_SYSCALL_OPEN) {
         char name[32];
         if (!user_buffer_is_valid(frame->ebx, frame->ecx) || frame->ecx == 0 || frame->ecx >= sizeof(name)) {
             frame->eax = (uint32_t) -1;
@@ -101,7 +92,7 @@ void syscall_handle(struct interrupt_frame *frame)
         return;
     }
 
-    if (frame->eax == SYSCALL_READ) {
+    if (frame->eax == MYOS_SYSCALL_READ) {
         uint32_t fd = frame->ebx;
         uint32_t size = frame->edx;
         if (!user_buffer_is_valid(frame->ecx, size)) {
@@ -113,22 +104,22 @@ void syscall_handle(struct interrupt_frame *frame)
         return;
     }
 
-    if (frame->eax == SYSCALL_CLOSE) {
+    if (frame->eax == MYOS_SYSCALL_CLOSE) {
         frame->eax = (uint32_t) user_process_fd_close(frame->ebx);
         return;
     }
 
-    if (frame->eax == SYSCALL_GETPID) {
+    if (frame->eax == MYOS_SYSCALL_GETPID) {
         frame->eax = user_process_current_pid();
         return;
     }
 
-    if (frame->eax == SYSCALL_WAITPID) {
+    if (frame->eax == MYOS_SYSCALL_WAITPID) {
         frame->eax = (uint32_t) user_process_wait_pid(frame->ebx);
         return;
     }
 
-    if (frame->eax == SYSCALL_WRITEFILE) {
+    if (frame->eax == MYOS_SYSCALL_WRITEFILE) {
         char name[32];
         if (!user_buffer_is_valid(frame->ebx, frame->ecx) || frame->ecx == 0 || frame->ecx >= sizeof(name) ||
             !user_buffer_is_valid(frame->edx, frame->esi)) {
@@ -139,6 +130,11 @@ void syscall_handle(struct interrupt_frame *frame)
         copy_from_user(name, (const char *) frame->ebx, frame->ecx);
         name[frame->ecx] = '\0';
         frame->eax = diskfs_write_file(name, (const void *) frame->edx, frame->esi) ? 0 : (uint32_t) -2;
+        return;
+    }
+
+    if (frame->eax == MYOS_SYSCALL_GUI_OPEN) {
+        frame->eax = (uint32_t) gui_open_application(frame->ebx);
         return;
     }
 

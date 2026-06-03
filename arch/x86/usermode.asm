@@ -9,6 +9,11 @@ EXTERN tss_set_kernel_stack
 
 ; int usermode_enter(uint32_t entry, uint32_t user_stack)
 usermode_enter:
+    push ebp
+    mov ebp, esp
+    push ebx
+    push esi
+    push edi
     mov [usermode_saved_esp], esp
 
     mov eax, kernel_syscall_stack_top
@@ -16,8 +21,8 @@ usermode_enter:
     call tss_set_kernel_stack
     add esp, 4
 
-    mov eax, [esp + 4]
-    mov edx, [esp + 8]
+    mov eax, [ebp + 8]
+    mov edx, [ebp + 12]
 
     cli
     mov cx, 0x23
@@ -36,6 +41,10 @@ usermode_enter:
 
 usermode_return_from_exit:
     mov esp, [usermode_saved_esp]
+    pop edi
+    pop esi
+    pop ebx
+    pop ebp
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -45,12 +54,13 @@ usermode_return_from_exit:
     ret
 
 SECTION .bss
-ALIGN 16
-kernel_syscall_stack:
-    resb 8192
-kernel_syscall_stack_top:
-
+alignb 16
 usermode_saved_esp:
     resd 1
 usermode_exit_code:
     resd 1
+
+alignb 16
+kernel_syscall_stack:
+    resb 8192
+kernel_syscall_stack_top:
