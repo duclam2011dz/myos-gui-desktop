@@ -93,8 +93,8 @@ and exception diagnostics.
   - Diskfs packages `/assets/wallpaper.myimg` and
     `/assets/cursor_pointer.myimg`; the desktop renders those assets instead of
     the old hard-coded gradient wallpaper and bitmask cursor.
-  - Cursor assets now include a 6x8 pointer and a text-entry `|` cursor variant
-    generated from the atlas.
+  - Cursor assets now include matching 12x16 pointer and text-entry `|`
+    variants generated from the atlas.
   - Source folders are grouped by responsibility: build/test/dev tools live
     under `tools/`, drivers under `kernel/drivers/{input,platform,storage,video}`,
     assets under `kernel/assets`, and diskfs under `kernel/fs/diskfs`.
@@ -114,9 +114,10 @@ and exception diagnostics.
   - CMOS RTC provides real taskbar wall-clock time.
   - PCI config-space scanning records devices and exposes a `pci` shell command.
 - Cursor and power UX:
-  - GUI cursor drawing now animates toward the real mouse target in small steps,
-    reducing visible pointer jumps from large PS/2 deltas while keeping pointer
-    response fast.
+  - GUI cursor drawing now follows the real mouse coordinates directly without
+    interpolation or periodic animation invalidation.
+  - Cursor updates use a small framebuffer overlay that restores the previous
+    background and redraws only the cursor region when the pointer moves.
   - Typing printable text temporarily switches the pointer to the text cursor.
   - Start Menu includes Shutdown and Restart actions wired to platform power
     routines.
@@ -165,8 +166,12 @@ and exception diagnostics.
      IntelliMouse wheel packets, CMOS time, and PCI enumeration are implemented.
    - Next platform work: identify PCI IDE/class drivers, add controller-specific
      driver binding, and surface PCI device names in GUI diagnostics.
-   - Next input work: add Alt-Tab, text selection shortcuts, region-specific
-     cursor shape selection, and full scancode set coverage for extended keys.
+   - Next input work: add Alt-Tab, text selection shortcuts, and full scancode
+     set coverage for extended keys.
+   - Next cursor work: introduce a cursor manager with window/client shape
+     selection, investigate hardware cursor support for supported graphics
+     backends, add a richer cursor shape set, support independent high-frequency
+     cursor updates, and add frame/input timing diagnostics.
 
 5. Filesystem and reliability
    - Current state: diskfs v2 has directory-aware paths, inodes, bitmap
@@ -180,6 +185,6 @@ and exception diagnostics.
 ## Suggested Immediate Milestone
 
 Next time, generalize the C++ window manager and widget model. The OS now has
-asset-backed visuals, smoother cursor presentation, power actions, dirty-region
+asset-backed visuals, direct cursor overlay updates, power actions, dirty-region
 tracking, and C++ GUI modules; the next bottleneck is replacing single-app
 assumptions with reusable window/widget abstractions.

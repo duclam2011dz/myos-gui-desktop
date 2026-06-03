@@ -16,7 +16,7 @@ CROSS_GCC_INCLUDE := $(shell $(CC) -print-file-name=include)
 
 BUILD_DIR := build
 STAGE2_SECTORS := 4
-KERNEL_SECTORS := 256
+KERNEL_SECTORS := 288
 FS_SECTORS := 4096
 FS_START_LBA := $(shell echo $$((1 + $(STAGE2_SECTORS) + $(KERNEL_SECTORS))))
 BOOT_BIN := $(BUILD_DIR)/boot.bin

@@ -22,6 +22,10 @@ extern "C" {
 
 namespace myos::gui {
 
+static constexpr int32_t CURSOR_OVERLAY_MARGIN = 16;
+static constexpr int32_t CURSOR_OVERLAY_MAX_W = 64;
+static constexpr int32_t CURSOR_OVERLAY_MAX_H = 64;
+
 class GuiSystem {
 public:
     void initialize();
@@ -52,21 +56,23 @@ private:
     int32_t last_files_click_index_ = -1;
     uint32_t last_files_click_tick_ = 0;
     uint32_t input_events_since_report_ = 0;
-    int32_t cursor_draw_x_ = 0;
-    int32_t cursor_draw_y_ = 0;
     uint32_t cursor_text_until_tick_ = 0;
+    bool cursor_overlay_saved_ = false;
+    bool cursor_overlay_text_mode_ = false;
+    Rect cursor_overlay_rect_ = {};
+    uint8_t cursor_overlay_background_[CURSOR_OVERLAY_MAX_W * CURSOR_OVERLAY_MAX_H * 4] = {};
 
     void mark_dirty();
     void invalidate_rect(Rect rect);
     void invalidate_window(const Window &window);
     void draw();
     void flush_dirty();
-    void draw_cursor(graphics_surface *surface);
     bool cursor_text_mode() const;
     int32_t cursor_width() const;
     int32_t cursor_height() const;
-    void invalidate_cursor_at(int32_t x, int32_t y);
-    void update_cursor_animation();
+    Rect cursor_overlay_rect_at(int32_t x, int32_t y) const;
+    void restore_cursor_overlay(graphics_surface *screen);
+    void redraw_cursor_overlay(graphics_surface *screen, bool force);
     HitResult hit_test(int32_t x, int32_t y) const;
     Window *window_for_app(AppId app);
     UtilityApp *utility_for_app(AppId app);
@@ -139,11 +145,6 @@ void GuiSystem::invalidate_window(const Window &window)
     invalidate_rect(window.rect());
 }
 
-void GuiSystem::draw_cursor(graphics_surface *surface)
-{
-    (void) assets_draw_cursor(surface, cursor_draw_x_, cursor_draw_y_, cursor_text_mode());
-}
-
 bool GuiSystem::cursor_text_mode() const
 {
     return (int32_t) (cursor_text_until_tick_ - timer_ticks()) > 0;
@@ -161,42 +162,84 @@ int32_t GuiSystem::cursor_height() const
     return height > 0 ? height : 24;
 }
 
-void GuiSystem::invalidate_cursor_at(int32_t x, int32_t y)
+Rect GuiSystem::cursor_overlay_rect_at(int32_t x, int32_t y) const
 {
-    invalidate_rect(Rect{x - 16, y - 16, cursor_width() + 32, cursor_height() + 32});
+    Rect rect{x - CURSOR_OVERLAY_MARGIN, y - CURSOR_OVERLAY_MARGIN,
+              cursor_width() + CURSOR_OVERLAY_MARGIN * 2, cursor_height() + CURSOR_OVERLAY_MARGIN * 2};
+    if (rect.x < 0) {
+        rect.w += rect.x;
+        rect.x = 0;
+    }
+    if (rect.y < 0) {
+        rect.h += rect.y;
+        rect.y = 0;
+    }
+    if (rect.x >= (int32_t) metrics_.width || rect.y >= (int32_t) metrics_.height) {
+        return Rect{0, 0, 0, 0};
+    }
+    if (rect.x + rect.w > (int32_t) metrics_.width) {
+        rect.w = (int32_t) metrics_.width - rect.x;
+    }
+    if (rect.y + rect.h > (int32_t) metrics_.height) {
+        rect.h = (int32_t) metrics_.height - rect.y;
+    }
+    if (rect.w > CURSOR_OVERLAY_MAX_W) {
+        rect.w = CURSOR_OVERLAY_MAX_W;
+    }
+    if (rect.h > CURSOR_OVERLAY_MAX_H) {
+        rect.h = CURSOR_OVERLAY_MAX_H;
+    }
+    return rect;
 }
 
-void GuiSystem::update_cursor_animation()
+void GuiSystem::restore_cursor_overlay(graphics_surface *screen)
 {
-    int32_t target_x = mouse_x();
-    int32_t target_y = mouse_y();
-    int32_t dx = target_x - cursor_draw_x_;
-    int32_t dy = target_y - cursor_draw_y_;
-    if (dx == 0 && dy == 0) {
+    if (!cursor_overlay_saved_ || screen == nullptr || cursor_overlay_rect_.empty()) {
         return;
     }
-    invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
-    int32_t abs_dx = dx < 0 ? -dx : dx;
-    int32_t abs_dy = dy < 0 ? -dy : dy;
-    int32_t max_delta = max_i32(abs_dx, abs_dy);
-    int32_t step = max_delta / 2;
-    if (step < 2) {
-        step = 2;
+    uint32_t bytes_per_pixel = (screen->bits_per_pixel + 7) / 8;
+    uint32_t row_bytes = (uint32_t) cursor_overlay_rect_.w * bytes_per_pixel;
+    for (int32_t row = 0; row < cursor_overlay_rect_.h; row++) {
+        uint8_t *dst = screen->pixels + ((uint32_t) cursor_overlay_rect_.y + (uint32_t) row) * screen->pitch +
+                       (uint32_t) cursor_overlay_rect_.x * bytes_per_pixel;
+        const uint8_t *src = cursor_overlay_background_ + (uint32_t) row * row_bytes;
+        for (uint32_t i = 0; i < row_bytes; i++) {
+            dst[i] = src[i];
+        }
     }
-    if (step > 28) {
-        step = 28;
+    cursor_overlay_saved_ = false;
+}
+
+void GuiSystem::redraw_cursor_overlay(graphics_surface *screen, bool force)
+{
+    if (screen == nullptr) {
+        return;
     }
-    if (abs_dx <= step) {
-        cursor_draw_x_ = target_x;
-    } else {
-        cursor_draw_x_ += dx > 0 ? step : -step;
+    bool text_mode = cursor_text_mode();
+    Rect next = cursor_overlay_rect_at(mouse_x(), mouse_y());
+    if (!force && cursor_overlay_saved_ && cursor_overlay_text_mode_ == text_mode &&
+        cursor_overlay_rect_.x == next.x && cursor_overlay_rect_.y == next.y &&
+        cursor_overlay_rect_.w == next.w && cursor_overlay_rect_.h == next.h) {
+        return;
     }
-    if (abs_dy <= step) {
-        cursor_draw_y_ = target_y;
-    } else {
-        cursor_draw_y_ += dy > 0 ? step : -step;
+    restore_cursor_overlay(screen);
+    if (next.empty()) {
+        return;
     }
-    invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
+    uint32_t bytes_per_pixel = (screen->bits_per_pixel + 7) / 8;
+    uint32_t row_bytes = (uint32_t) next.w * bytes_per_pixel;
+    for (int32_t row = 0; row < next.h; row++) {
+        const uint8_t *src = screen->pixels + ((uint32_t) next.y + (uint32_t) row) * screen->pitch +
+                             (uint32_t) next.x * bytes_per_pixel;
+        uint8_t *dst = cursor_overlay_background_ + (uint32_t) row * row_bytes;
+        for (uint32_t i = 0; i < row_bytes; i++) {
+            dst[i] = src[i];
+        }
+    }
+    cursor_overlay_rect_ = next;
+    cursor_overlay_text_mode_ = text_mode;
+    cursor_overlay_saved_ = true;
+    (void) assets_draw_cursor(screen, mouse_x(), mouse_y(), text_mode);
 }
 
 void GuiSystem::draw()
@@ -210,26 +253,32 @@ void GuiSystem::draw()
     monitor_.draw(&backbuffer_);
     files_.draw(&backbuffer_);
     terminal_.draw(&backbuffer_);
-    draw_cursor(&backbuffer_);
 }
 
 void GuiSystem::flush_dirty()
 {
     graphics_surface *screen = graphics_primary_surface_mut();
-    if (screen == nullptr || !dirty_) {
+    if (screen == nullptr) {
         return;
     }
 
-    draw();
-    if (full_repaint_ || dirty_rect_.empty()) {
-        graphics_blit(screen, &backbuffer_);
-    } else {
-        graphics_blit_rect(screen, &backbuffer_, (uint32_t) dirty_rect_.x, (uint32_t) dirty_rect_.y,
-                           (uint32_t) dirty_rect_.w, (uint32_t) dirty_rect_.h);
+    if (dirty_) {
+        restore_cursor_overlay(screen);
+        draw();
+        if (full_repaint_ || dirty_rect_.empty()) {
+            graphics_blit(screen, &backbuffer_);
+        } else {
+            graphics_blit_rect(screen, &backbuffer_, (uint32_t) dirty_rect_.x, (uint32_t) dirty_rect_.y,
+                               (uint32_t) dirty_rect_.w, (uint32_t) dirty_rect_.h);
+        }
+        dirty_ = false;
+        full_repaint_ = false;
+        dirty_rect_ = Rect{0, 0, 0, 0};
+        redraw_cursor_overlay(screen, true);
+        return;
     }
-    dirty_ = false;
-    full_repaint_ = false;
-    dirty_rect_ = Rect{0, 0, 0, 0};
+
+    redraw_cursor_overlay(screen, false);
 }
 
 static HitTarget target_from_window_area(WindowArea area)
@@ -697,7 +746,6 @@ void GuiSystem::handle_event(const gui_event &event)
         }
         if ((event.key >= ' ' && event.key <= '~') || event.key == '\b' || event.key == '\n') {
             cursor_text_until_tick_ = timer_ticks() + 80;
-            invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
         }
         if (event.key == GUI_KEY_F1) {
             open_app(AppId::Terminal);
@@ -756,7 +804,7 @@ void GuiSystem::handle_event(const gui_event &event)
         if (event.pressed) {
             handle_mouse_drag(event.x, event.y);
         }
-        invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
+        redraw_cursor_overlay(graphics_primary_surface_mut(), false);
         return;
     }
     if (event.type == GUI_EVENT_TIMER_TICK) {
@@ -810,9 +858,10 @@ void GuiSystem::initialize()
     last_files_click_tick_ = 0;
     input_events_since_report_ = 0;
     assets_initialize();
-    cursor_draw_x_ = mouse_x();
-    cursor_draw_y_ = mouse_y();
     cursor_text_until_tick_ = 0;
+    cursor_overlay_saved_ = false;
+    cursor_overlay_text_mode_ = false;
+    cursor_overlay_rect_ = Rect{0, 0, 0, 0};
 
     serial_writestring("MyOS GUI: desktop initialized with no open apps.\n");
     serial_writestring("MyOS GUI: double buffering enabled.\n");
@@ -826,7 +875,6 @@ void GuiSystem::initialize()
 void GuiSystem::run()
 {
     uint32_t last_second = timer_uptime_seconds();
-    uint32_t last_cursor_tick = timer_ticks();
     uint32_t last_input_report = timer_ticks();
     for (;;) {
         gui_event event;
@@ -835,7 +883,6 @@ void GuiSystem::run()
             handle_event(event);
             drained++;
         }
-        update_cursor_animation();
 
         uint32_t second = timer_uptime_seconds();
         if (second != last_second) {
@@ -846,11 +893,6 @@ void GuiSystem::run()
         }
 
         uint32_t tick = timer_ticks();
-        if (tick - last_cursor_tick >= 20) {
-            last_cursor_tick = tick;
-            invalidate_cursor_at(cursor_draw_x_, cursor_draw_y_);
-        }
-
         if (tick - last_input_report >= 100) {
             if (input_events_since_report_ > 0) {
                 serial_writestring("MyOS GUI: input batch processed.\n");

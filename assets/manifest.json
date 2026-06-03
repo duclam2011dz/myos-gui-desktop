@@ -15,8 +15,8 @@
       "width": 235,
       "height": 310
     },
-    "width": 6,
-    "height": 8,
+    "width": 12,
+    "height": 16,
     "format": "argb32",
     "hotspot_x": 1,
     "hotspot_y": 1
@@ -30,10 +30,10 @@
       "width": 78,
       "height": 250
     },
-    "width": 8,
-    "height": 32,
+    "width": 12,
+    "height": 16,
     "format": "argb32",
-    "hotspot_x": 4,
-    "hotspot_y": 16
+    "hotspot_x": 6,
+    "hotspot_y": 8
   }
 }

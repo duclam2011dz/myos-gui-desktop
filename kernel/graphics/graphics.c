@@ -3,6 +3,17 @@
 static struct graphics_surface primary_surface;
 static bool primary_surface_ready;
 
+static void graphics_copy_bytes(uint8_t *dst, const uint8_t *src, uint32_t count)
+{
+    uint32_t i = 0;
+    for (; i + sizeof(uint32_t) <= count; i += sizeof(uint32_t)) {
+        *((uint32_t *) (dst + i)) = *((const uint32_t *) (src + i));
+    }
+    for (; i < count; i++) {
+        dst[i] = src[i];
+    }
+}
+
 static uint32_t palette_color(uint32_t color)
 {
     static const uint32_t palette[16] = {
@@ -204,9 +215,7 @@ void graphics_blit(struct graphics_surface *dst, const struct graphics_surface *
         for (uint32_t y = 0; y < height; y++) {
             uint8_t *dst_row = dst->pixels + y * dst->pitch;
             const uint8_t *src_row = src->pixels + y * src->pitch;
-            for (uint32_t i = 0; i < row_bytes; i++) {
-                dst_row[i] = src_row[i];
-            }
+            graphics_copy_bytes(dst_row, src_row, row_bytes);
         }
         return;
     }
@@ -241,9 +250,7 @@ void graphics_blit_rect(struct graphics_surface *dst, const struct graphics_surf
         for (uint32_t row = 0; row < height; row++) {
             uint8_t *dst_row = dst->pixels + (y + row) * dst->pitch + x * bytes_per_pixel;
             const uint8_t *src_row = src->pixels + (y + row) * src->pitch + x * bytes_per_pixel;
-            for (uint32_t i = 0; i < row_bytes; i++) {
-                dst_row[i] = src_row[i];
-            }
+            graphics_copy_bytes(dst_row, src_row, row_bytes);
         }
         return;
     }
